@@ -1,4 +1,4 @@
-# Antville
+# Antville — Minecraft Material Tracker
 
 Веб-сервис для учёта построек и материалов на Minecraft-сервере. Antville хранит каталог построек с привязкой к координатам мира, прикреплённой схемой [Litematica](https://www.curseforge.com/minecraft/mc-mods/litematica) и автоматически сгенерированным чек-листом материалов — со стаками, шалкерами и отметкой, кто из игроков что добыл.
 
