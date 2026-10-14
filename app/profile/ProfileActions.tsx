@@ -130,7 +130,7 @@ function RequiredPasswordDialog({
       aria-labelledby="required-password-title"
       aria-describedby="required-password-description"
       onCancel={(event) => event.preventDefault()}
-      className="min-h-[calc(100dvh_-_2rem)] max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-3xl overflow-y-auto rounded-[2rem] border border-rose-200/30 bg-[#160d13]/[.97] p-0 text-white shadow-[0_32px_120px_rgba(104,18,52,.48)] backdrop:bg-[#070509]/90 backdrop:backdrop-blur-md"
+      className="fixed left-1/2 top-1/2 right-auto bottom-auto m-0 min-h-[calc(100dvh_-_2rem)] max-h-[calc(100dvh_-_2rem)] w-[calc(100vw_-_2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[2rem] border border-rose-200/30 bg-[#160d13]/[.97] p-0 text-white shadow-[0_32px_120px_rgba(104,18,52,.48)] backdrop:bg-[#070509]/90 backdrop:backdrop-blur-md"
     >
       <div className="relative flex min-h-[calc(100dvh_-_2rem)] flex-col justify-between overflow-hidden p-6 sm:p-10 md:p-14">
         <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-rose-500/20 blur-3xl" />
