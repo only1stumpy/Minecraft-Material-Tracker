@@ -9,44 +9,320 @@ datasource db {
 
 enum UserRole {
   ADMIN
+  MODERATOR
   PLAYER
 }
 
+enum BuildingStatus {
+  DRAFT
+  PLANNED
+  COLLECTING
+  READY
+  BUILDING
+  COMPLETED
+  PAUSED
+  ARCHIVED
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum MaterialActivityKind {
+  RESERVED
+  RELEASED
+  GATHERED
+  DELIVERED
+  CORRECTED
+}
+
+enum NotificationKind {
+  BUILDING_ASSIGNED
+  BUILDING_STATUS_CHANGED
+  MATERIAL_RESERVED
+  MATERIAL_GATHERED
+  MATERIAL_DELIVERED
+  COMMENT_ADDED
+  ROLE_CHANGED
+}
+
+enum WarehouseMovementKind {
+  RECEIVED
+  USED
+  ADJUSTED
+}
+
 model Building {
-  id                 String   @id @default(cuid())
-  name               String
-  x                  Int
-  y                  Int
-  z                  Int
-  schematicFileName  String
-  materialsFileName  String
-  screenshotDataUrl  String?
-  materials          Json
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  ownerId            String?
-  owner              User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  deletedAt          DateTime?
+  id                   String         @id @default(cuid())
+  name                 String
+  description          String?
+  x                    Int?
+  y                    Int?
+  z                    Int?
+  schematicFileName    String?
+  schematicPath        String?
+  schematicSize        Int?
+  schematicContentType String?
+  materialsFileName    String?
+  // Kept for existing records; new uploads use private object storage.
+  legacyScreenshotDataUrl String?      @map("screenshotDataUrl")
+  screenshotPath       String?
+  screenshotSize       Int?
+  // Retained as an import snapshot; current application reads normalized Material rows.
+  legacyMaterials      Json           @default("[]") @map("materials")
+  legacyChecklist      Json?
+  status               BuildingStatus @default(DRAFT)
+  version              Int            @default(1)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  archivedAt           DateTime?
+  ownerId              String?
+  owner                User?          @relation("BuildingOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  responsibleId        String?
+  responsible          User?          @relation("BuildingResponsible", fields: [responsibleId], references: [id], onDelete: SetNull)
+  deletedAt            DateTime?
+  materials            Material[]
+  revisions            BuildingRevision[]
+  tasks                BuildingTask[]
+  comments             Comment[]
+  favorites            Favorite[]
 
   @@index([ownerId])
+  @@index([responsibleId])
+  @@index([status, updatedAt])
   @@index([deletedAt, createdAt])
 }
 
+model Material {
+  id             String                @id @default(cuid())
+  buildingId     String
+  building       Building              @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  name           String
+  normalizedName String
+  requiredQty    Int
+  stackSize      Int                   @default(64)
+  allowSurplus   Boolean               @default(false)
+  isArchived     Boolean               @default(false)
+  sortOrder      Int                   @default(0)
+  legacySnapshot Json?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  contributions  MaterialContribution[]
+  reservations   MaterialReservation[]
+  activities     MaterialActivity[]
+  comments       Comment[]
+
+  @@unique([buildingId, normalizedName])
+  @@index([buildingId, sortOrder, name])
+}
+
+model MaterialContribution {
+  id          String   @id @default(cuid())
+  materialId  String
+  material    Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gatheredQty Int      @default(0)
+  deliveredQty Int     @default(0)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([materialId, userId])
+  @@index([userId, updatedAt])
+}
+
+model MaterialReservation {
+  id           String           @id @default(cuid())
+  materialId   String
+  material     Material         @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quantity     Int
+  gatheredQty  Int              @default(0)
+  releasedAt   DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  activities   MaterialActivity[]
+
+  @@index([materialId, releasedAt])
+  @@index([userId, releasedAt])
+}
+
+model MaterialActivity {
+  id            String               @id @default(cuid())
+  operationId   String               @unique
+  materialId    String
+  material      Material             @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  actorId       String
+  actor         User                 @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  reservationId String?
+  reservation   MaterialReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  kind          MaterialActivityKind
+  quantityDelta Int
+  metadata      Json?
+  createdAt     DateTime             @default(now())
+
+  @@index([materialId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model BuildingRevision {
+  id         String   @id @default(cuid())
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  version    Int
+  actorId    String?
+  actor      User?    @relation("BuildingRevisionActor", fields: [actorId], references: [id], onDelete: SetNull)
+  snapshot   Json
+  createdAt  DateTime @default(now())
+
+  @@unique([buildingId, version])
+  @@index([buildingId, createdAt])
+}
+
+model BuildingTask {
+  id          String     @id @default(cuid())
+  buildingId  String
+  building    Building   @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  status      TaskStatus @default(OPEN)
+  assigneeId  String?
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdById String
+  createdBy   User       @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([buildingId, status, createdAt])
+  @@index([assigneeId, status])
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  buildingId  String
+  building    Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  materialId  String?
+  material    Material? @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User      @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  body        String
+  hiddenAt    DateTime?
+  moderatedById String?
+  moderatedBy User?     @relation("CommentModerator", fields: [moderatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([buildingId, createdAt])
+  @@index([materialId, createdAt])
+}
+
+model Favorite {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([userId, buildingId])
+  @@index([buildingId])
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  recipientId String
+  recipient   User             @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actorId     String?
+  actor       User?            @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  kind        NotificationKind
+  buildingId  String?
+  entityId    String?
+  payload     Json?
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@index([recipientId, readAt, createdAt])
+}
+
+model NotificationPreference {
+  userId  String
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind    NotificationKind
+  enabled Boolean          @default(true)
+
+  @@id([userId, kind])
+}
+
+model WarehouseStock {
+  id             String              @id @default(cuid())
+  itemName       String
+  normalizedName String              @unique
+  stackSize      Int                 @default(64)
+  quantity       Int                 @default(0)
+  updatedAt      DateTime            @updatedAt
+  movements      WarehouseMovement[]
+}
+
+model WarehouseMovement {
+  id        String               @id @default(cuid())
+  stockId   String
+  stock     WarehouseStock      @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  actorId   String
+  actor     User                 @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  kind      WarehouseMovementKind
+  delta     Int
+  note      String?
+  createdAt DateTime             @default(now())
+
+  @@index([stockId, createdAt])
+}
+
+model ImportLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  fileName   String?
+  success    Boolean  @default(false)
+  error      String?
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+}
+
 model User {
-  id                 String      @id @default(cuid())
-  minecraftNickname  String      @unique
-  normalizedNickname String      @unique
-  passwordHash       String
-  role               UserRole    @default(PLAYER)
-  isBlocked          Boolean     @default(false)
-  mustChangePassword Boolean     @default(true)
-  sessionVersion     Int         @default(0)
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-  lastActiveAt       DateTime?
-  buildings          Building[]
-  sessions           Session[]
-  auditLogs           AuditLog[] @relation("AuditActor")
+  id                  String                 @id @default(cuid())
+  minecraftNickname   String                 @unique
+  normalizedNickname  String                 @unique
+  passwordHash        String
+  role                UserRole               @default(PLAYER)
+  isBlocked           Boolean                @default(false)
+  mustChangePassword  Boolean                @default(true)
+  sessionVersion      Int                    @default(0)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  lastActiveAt        DateTime?
+  buildings           Building[]             @relation("BuildingOwner")
+  responsibleBuildings Building[]            @relation("BuildingResponsible")
+  sessions            Session[]
+  auditLogs           AuditLog[]             @relation("AuditActor")
+  revisions           BuildingRevision[]     @relation("BuildingRevisionActor")
+  tasksCreated        BuildingTask[]          @relation("TaskCreator")
+  tasksAssigned       BuildingTask[]          @relation("TaskAssignee")
+  contributions       MaterialContribution[]
+  reservations        MaterialReservation[]
+  materialActivities  MaterialActivity[]
+  comments            Comment[]               @relation("CommentAuthor")
+  moderatedComments   Comment[]               @relation("CommentModerator")
+  favorites           Favorite[]
+  notifications       Notification[]          @relation("NotificationRecipient")
+  sentNotifications   Notification[]          @relation("NotificationActor")
+  notificationPrefs   NotificationPreference[]
+  warehouseMovements  WarehouseMovement[]
+  importLogs          ImportLog[]
 
   @@index([role, isBlocked])
 }
@@ -61,13 +337,13 @@ model AuthThrottle {
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  version   Int
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version    Int
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
 
   @@index([userId])

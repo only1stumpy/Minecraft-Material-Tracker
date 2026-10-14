@@ -8,10 +8,11 @@ import { validateSameOrigin } from "@/lib/security";
 export async function POST(request: Request) {
   if (!validateSameOrigin(request)) return NextResponse.json({ error: "Недопустимый запрос" }, { status: 403 });
   const actor = await getCurrentUser();
-  if (!actor || actor.role !== "ADMIN") return NextResponse.json({ error: "Недостаточно прав" }, { status: 403 });
+  if (!actor || actor.role !== "ADMIN" || actor.mustChangePassword) return NextResponse.json({ error: "Недостаточно прав" }, { status: 403 });
   const body = await request.json().catch(() => null) as { nickname?: unknown; role?: unknown } | null;
   const nickname = typeof body?.nickname === "string" ? body.nickname.trim() : "";
-  const role = body?.role === "ADMIN" ? "ADMIN" : "PLAYER";
+  const role = body?.role === undefined ? "PLAYER" : body.role;
+  if (role !== "ADMIN" && role !== "MODERATOR" && role !== "PLAYER") return NextResponse.json({ error: "Некорректная роль" }, { status: 400 });
   if (!/^[A-Za-z0-9_]{3,16}$/.test(nickname)) return NextResponse.json({ error: "Minecraft-ник должен содержать 3–16 латинских букв, цифр или _" }, { status: 400 });
   const temporaryPassword = generateTemporaryPassword();
   const passwordHash = await hashPassword(temporaryPassword);

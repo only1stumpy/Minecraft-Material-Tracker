@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "engines": {
-    "node": ">=20.19 <23"
+    "node": ">=22.12 <23 || >=24.11 <25"
   },
   "scripts": {
     "dev": "next dev",
@@ -18,10 +18,13 @@
     "db:migrate:sqlite": "node scripts/migrate-sqlite-buildings.mjs",
     "admin:bootstrap": "node scripts/bootstrap-admin.mjs",
     "db:backup": "bash scripts/backup-database.sh",
+    "admin:grant-moderator": "node scripts/grant-moderator.mjs",
+    "region:measure": "node scripts/measure-regions.mjs",
     "prisma:generate": "prisma generate",
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@vercel/blob": "^2.3.0",
     "@prisma/client": "6.19.2",
     "next": "16.1.6",
     "prisma": "6.19.2",

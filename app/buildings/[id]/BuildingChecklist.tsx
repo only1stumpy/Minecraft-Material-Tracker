@@ -1,103 +1,271 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
-import { MaterialRow, toShulkers, toStacks } from "@/lib/materials";
+import { breakdownMaterial, integerPercentComplete } from "@/lib/materials";
 
-type ChecklistRow = MaterialRow & {
-  gatheredBy: string;
-  isGathered: boolean;
+type Contribution = {
+  userId: string;
+  gatheredQty: number;
+  deliveredQty: number;
+  user: { minecraftNickname: string };
 };
 
-type BuildingChecklistProps = {
-  materials: MaterialRow[];
+type Reservation = {
+  id: string;
+  userId: string;
+  quantity: number;
+  gatheredQty: number;
+  releasedAt: Date | null;
+  user: { minecraftNickname: string };
 };
 
-const numberFormatter = new Intl.NumberFormat("ru-RU", {
-  maximumFractionDigits: 2,
-});
+type ChecklistMaterial = {
+  id: string;
+  name: string;
+  requiredQty: number;
+  stackSize: number;
+  allowSurplus: boolean;
+  sortOrder: number;
+  contributions: Contribution[];
+  reservations: Reservation[];
+};
 
-export default function BuildingChecklist({ materials }: BuildingChecklistProps) {
-  const [rows, setRows] = useState<ChecklistRow[]>(() =>
-    materials.map((row) => ({ ...row, gatheredBy: "", isGathered: false }))
+type Props = {
+  buildingId: string;
+  materials: ChecklistMaterial[];
+  actorId: string;
+  canModerate: boolean;
+  canParticipate: boolean;
+  initialFilters: BuildingChecklistFilters;
+};
+
+type Action = "reserve" | "release" | "gather" | "deliver" | "correct";
+export type MaterialFilter = "all" | "mine" | "free" | "active" | "ready";
+export type MaterialSort = "name" | "remaining" | "gathered";
+export type BuildingChecklistFilters = {
+  materialFilter: MaterialFilter;
+  materialQ: string;
+  materialSort: MaterialSort;
+  materialHideCompleted: boolean;
+};
+
+const MAX_SEARCH_LENGTH = 120;
+
+const numberFormatter = new Intl.NumberFormat("ru-RU");
+
+function quantities(row: ChecklistMaterial) {
+  const gathered = row.contributions.reduce((sum, contribution) => sum + contribution.gatheredQty, 0);
+  const delivered = row.contributions.reduce((sum, contribution) => sum + contribution.deliveredQty, 0);
+  const reserved = row.reservations.reduce(
+    (sum, reservation) => sum + (reservation.releasedAt ? 0 : reservation.quantity - reservation.gatheredQty),
+    0,
   );
+  const free = row.allowSurplus ? Number.MAX_SAFE_INTEGER : Math.max(0, row.requiredQty - gathered - reserved);
+  const remaining = Math.max(0, row.requiredQty - gathered);
+  const percent = integerPercentComplete(gathered, row.requiredQty);
+  return { gathered, delivered, reserved, free, remaining, percent };
+}
 
-  const totals = useMemo(() => {
-    const totalBlocks = rows.reduce((sum, row) => sum + row.total, 0);
-    const totalStacks = rows.reduce((sum, row) => sum + toStacks(row.total), 0);
-    const totalShulkers = rows.reduce((sum, row) => sum + toShulkers(row.total), 0);
+function breakdownLabel(quantity: number, stackSize: number) {
+  const parts = breakdownMaterial(quantity, stackSize);
+  return [
+    parts.fullShulkers > 0 ? `${parts.fullShulkers} ш.` : "",
+    parts.fullStacks > 0 ? `${parts.fullStacks} ст.` : "",
+    parts.looseItems > 0 ? `${parts.looseItems} шт.` : "",
+  ].filter(Boolean).join(" ") || "0 шт.";
+}
 
-    return { totalBlocks, totalStacks, totalShulkers };
-  }, [rows]);
+async function responseError(response: Response) {
+  const body = await response.json().catch(() => null) as { error?: unknown } | null;
+  return typeof body?.error === "string" ? body.error : "Операция не выполнена";
+}
 
-  const updateGatheredBy = (item: string, value: string) => {
-    setRows((prev) =>
-      prev.map((row) => (row.item === item ? { ...row, gatheredBy: value } : row))
-    );
-  };
+export default function BuildingChecklist({
+  buildingId,
+  materials,
+  actorId,
+  canModerate,
+  canParticipate,
+  initialFilters,
+}: Props) {
+  const router = useRouter();
+  const [filter, setFilter] = useState<MaterialFilter>(initialFilters.materialFilter);
+  const [search, setSearch] = useState(initialFilters.materialQ);
+  const [sort, setSort] = useState<MaterialSort>(initialFilters.materialSort);
+  const [hideCompleted, setHideCompleted] = useState(initialFilters.materialHideCompleted);
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
 
-  const toggleGathered = (item: string) => {
-    setRows((prev) =>
-      prev.map((row) =>
-        row.item === item ? { ...row, isGathered: !row.isGathered } : row
-      )
-    );
-  };
+  const totalRequired = materials.reduce((sum, row) => sum + row.requiredQty, 0);
+  const totalGathered = materials.reduce((sum, row) => sum + quantities(row).gathered, 0);
+  const totalDelivered = materials.reduce((sum, row) => sum + quantities(row).delivered, 0);
 
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 text-sm text-slate-400">
-        Не удалось распарсить материалы. Проверьте файл ресурсов.
-      </div>
-    );
+  function replaceFilterQuery(next: BuildingChecklistFilters) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("materialFilter", next.materialFilter);
+    url.searchParams.set("materialQ", next.materialQ);
+    url.searchParams.set("materialSort", next.materialSort);
+    url.searchParams.set("materialHideCompleted", String(next.materialHideCompleted));
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  function updateFilter(next: MaterialFilter) {
+    setFilter(next);
+    replaceFilterQuery({ materialFilter: next, materialQ: search, materialSort: sort, materialHideCompleted: hideCompleted });
+  }
+
+  function updateSearch(next: string) {
+    const normalized = next.slice(0, MAX_SEARCH_LENGTH);
+    setSearch(normalized);
+    replaceFilterQuery({ materialFilter: filter, materialQ: normalized, materialSort: sort, materialHideCompleted: hideCompleted });
+  }
+
+  function updateSort(next: MaterialSort) {
+    setSort(next);
+    replaceFilterQuery({ materialFilter: filter, materialQ: search, materialSort: next, materialHideCompleted: hideCompleted });
+  }
+
+  function updateHideCompleted(next: boolean) {
+    setHideCompleted(next);
+    replaceFilterQuery({ materialFilter: filter, materialQ: search, materialSort: sort, materialHideCompleted: next });
+  }
+
+  const visibleMaterials = useMemo(() => materials
+    .filter((row) => {
+      const progress = quantities(row);
+      if (hideCompleted && progress.gathered >= row.requiredQty) return false;
+      if (search && !row.name.toLocaleLowerCase("ru-RU").includes(search.toLocaleLowerCase("ru-RU"))) return false;
+      if (filter === "mine" && !row.contributions.some((contribution) => contribution.userId === actorId)
+        && !row.reservations.some((reservation) => reservation.userId === actorId && !reservation.releasedAt)) return false;
+      if (filter === "free" && progress.free <= 0) return false;
+      if (filter === "active" && progress.gathered === 0 && progress.reserved === 0) return false;
+      if (filter === "ready" && progress.gathered < row.requiredQty) return false;
+      return true;
+    })
+    .sort((left, right) => {
+      if (sort === "remaining") return quantities(right).remaining - quantities(left).remaining || left.name.localeCompare(right.name, "ru");
+      if (sort === "gathered") return quantities(right).gathered - quantities(left).gathered || left.name.localeCompare(right.name, "ru");
+      return left.name.localeCompare(right.name, "ru");
+    }), [materials, actorId, filter, hideCompleted, search, sort]);
+
+  async function runAction(row: ChecklistMaterial, action: Action, quantity: number, reservationId?: string, targetUserId?: string, direction?: "add" | "remove") {
+    setError("");
+    setSaveMessage("");
+    setBusyId(row.id);
+    try {
+      const response = await fetch(`/api/buildings/${encodeURIComponent(buildingId)}/materials/${encodeURIComponent(row.id)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          operationId: crypto.randomUUID(),
+          action,
+          ...(action === "release" ? {} : { quantity }),
+          ...(reservationId ? { reservationId } : {}),
+          ...(targetUserId ? { targetUserId } : {}),
+          ...(direction ? { direction } : {}),
+        }),
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      setSaveMessage("Изменение сохранено");
+      router.refresh();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Ошибка сохранения");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
-    <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
-      <div className="flex flex-col gap-2 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
-        <span>Всего блоков: {numberFormatter.format(totals.totalBlocks)}</span>
-        <span>Всего стаков: {numberFormatter.format(totals.totalStacks)}</span>
-        <span>Всего шалкеров: {numberFormatter.format(totals.totalShulkers)}</span>
+    <section className="space-y-5 rounded-3xl border border-slate-800 bg-slate-900/70 p-5 md:p-6" aria-labelledby="materials-heading">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 id="materials-heading" className="text-2xl font-semibold text-white">Материалы и вклад</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Собрано {numberFormatter.format(totalGathered)} / {numberFormatter.format(totalRequired)} · доставлено {numberFormatter.format(totalDelivered)}
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-3 text-sm md:text-right">
+          <span>Требуется <b className="block text-white">{numberFormatter.format(totalRequired)}</b></span>
+          <span>Собрано <b className="block text-emerald-300">{numberFormatter.format(totalGathered)}</b></span>
+          <span>Доставлено <b className="block text-sky-300">{numberFormatter.format(totalDelivered)}</b></span>
+        </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-800">
-        <div className="grid grid-cols-[0.4fr_1.6fr_0.6fr_0.6fr_0.6fr_1fr] gap-2 bg-slate-950 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          <span>Собрано</span>
-          <span>Блок</span>
-          <span className="text-right">Количество</span>
-          <span className="text-right">В стаках</span>
-          <span className="text-right">В шалкерах</span>
-          <span>Кто добыл</span>
-        </div>
-        <div className="max-h-[520px] divide-y divide-slate-800 overflow-auto">
-          {rows.map((row) => (
-            <div
-              key={row.item}
-              className="grid grid-cols-[0.4fr_1.6fr_0.6fr_0.6fr_0.6fr_1fr] gap-2 px-4 py-3 text-sm text-slate-200"
-            >
-              <label className="flex items-center justify-center">
-                <input
-                  type="checkbox"
-                  checked={row.isGathered}
-                  onChange={() => toggleGathered(row.item)}
-                  className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-emerald-400"
-                />
-              </label>
-              <span>{row.item}</span>
-              <span className="text-right">{numberFormatter.format(row.total)}</span>
-              <span className="text-right">{numberFormatter.format(toStacks(row.total))}</span>
-              <span className="text-right">{numberFormatter.format(toShulkers(row.total))}</span>
-              <input
-                type="text"
-                value={row.gatheredBy}
-                onChange={(event) => updateGatheredBy(row.item, event.target.value)}
-                placeholder="ник"
-                className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100 outline-none transition focus:border-emerald-400/60"
-              />
-            </div>
-          ))}
-        </div>
+      <div className="grid gap-3 md:grid-cols-[minmax(12rem,1fr)_auto_auto_auto]">
+        <label className="sr-only" htmlFor="material-search">Поиск материала</label>
+        <input id="material-search" value={search} onChange={(event) => updateSearch(event.target.value)} placeholder="Найти материал" className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm outline-none focus:border-emerald-400" />
+        <label className="sr-only" htmlFor="material-filter">Фильтр материалов</label>
+        <select id="material-filter" value={filter} onChange={(event) => updateFilter(event.target.value as MaterialFilter)} className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm"><option value="all">Все материалы</option><option value="mine">Мои материалы</option><option value="free">Свободные</option><option value="active">В работе</option><option value="ready">Собрано полностью</option></select>
+        <label className="sr-only" htmlFor="material-sort">Сортировка материалов</label>
+        <select id="material-sort" value={sort} onChange={(event) => updateSort(event.target.value as MaterialSort)} className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm"><option value="name">По названию</option><option value="remaining">Сначала большой остаток</option><option value="gathered">По собранному количеству</option></select>
+        <label className="flex items-center gap-2 rounded-xl border border-slate-700 px-3 text-sm text-slate-300"><input type="checkbox" checked={hideCompleted} onChange={(event) => updateHideCompleted(event.target.checked)} className="accent-emerald-400" />Скрыть собранное</label>
       </div>
+
+      {error && <p role="alert" className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</p>}
+      {saveMessage && <p role="status" className="text-sm text-emerald-300">{saveMessage}</p>}
+
+      {materials.length === 0 ? (
+        <p className="rounded-2xl border border-slate-800 bg-slate-950/70 p-6 text-sm text-slate-400">Материалы ещё не добавлены. Владелец или модератор может изменить карточку постройки.</p>
+      ) : visibleMaterials.length === 0 ? (
+        <p className="rounded-2xl border border-slate-800 bg-slate-950/70 p-6 text-sm text-slate-400">По этим фильтрам материалов нет.</p>
+      ) : (
+        <div className="space-y-3">
+          {visibleMaterials.map((row) => {
+            const progress = quantities(row);
+            const myContribution = row.contributions.find((item) => item.userId === actorId);
+            const ownReservations = row.reservations.filter((item) => item.userId === actorId && !item.releasedAt);
+            const currentReservation = ownReservations.find((item) => item.quantity > item.gatheredQty);
+            const unDelivered = (myContribution?.gatheredQty ?? 0) - (myContribution?.deliveredQty ?? 0);
+            const value = amounts[row.id] ?? String(currentReservation ? currentReservation.quantity - currentReservation.gatheredQty : Math.max(0, Math.min(progress.free, 64)));
+            const parsedAmount = Number(value);
+            const validAmount = Number.isSafeInteger(parsedAmount) && parsedAmount > 0;
+            const busy = busyId === row.id;
+            const itemBreakdown = breakdownMaterial(row.requiredQty, row.stackSize);
+
+            return (
+              <article key={row.id} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 md:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-white">{row.name}</h3>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Требуется {numberFormatter.format(row.requiredQty)} ({breakdownLabel(row.requiredQty, row.stackSize)}; {itemBreakdown.occupiedSlots} слотов) · стек {row.stackSize}
+                    </p>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p><b className="text-emerald-300">{numberFormatter.format(progress.gathered)}</b> собрано · <b className="text-sky-300">{numberFormatter.format(progress.delivered)}</b> доставлено</p>
+                    <p className="mt-1 text-slate-400">Осталось собрать: {numberFormatter.format(progress.remaining)} · свободно: {row.allowSurplus ? "без лимита" : numberFormatter.format(progress.free)}</p>
+                  </div>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-label={`Сбор материала ${row.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}>
+                  <div className="h-full rounded-full bg-emerald-400 transition-[width]" style={{ width: `${progress.percent}%` }} />
+                </div>
+
+                {row.reservations.length > 0 && <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">{row.reservations.map((reservation) => <li key={reservation.id}>{reservation.user.minecraftNickname}: взял {numberFormatter.format(reservation.quantity)}, собрал {numberFormatter.format(reservation.gatheredQty)}{reservation.releasedAt ? " (освободил)" : " (в работе)"}</li>)}</ul>}
+                {row.contributions.length > 0 && <p className="mt-2 text-xs text-slate-400">Вклад: {row.contributions.map((contribution) => `${contribution.user.minecraftNickname} — ${numberFormatter.format(contribution.gatheredQty)} собрано / ${numberFormatter.format(contribution.deliveredQty)} доставлено`).join(" · ")}</p>}
+
+                {canParticipate && <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-slate-800 pt-4">
+                  <label className="grid gap-1 text-xs text-slate-400">Количество<input inputMode="numeric" value={value} onChange={(event) => setAmounts((items) => ({ ...items, [row.id]: event.target.value }))} className="w-28 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white" /></label>
+                  {!currentReservation && <button type="button" disabled={busy || !validAmount || (!row.allowSurplus && parsedAmount > progress.free)} onClick={() => void runAction(row, "reserve", parsedAmount)} className="rounded-lg bg-emerald-400 px-3 py-2 text-sm font-semibold text-slate-950 disabled:opacity-40">Взять в работу</button>}
+                  {currentReservation && <>
+                    <button type="button" disabled={busy || !validAmount || parsedAmount > currentReservation.quantity - currentReservation.gatheredQty} onClick={() => void runAction(row, "gather", parsedAmount, currentReservation.id)} className="rounded-lg bg-emerald-400 px-3 py-2 text-sm font-semibold text-slate-950 disabled:opacity-40">Отметить сбор</button>
+                    <button type="button" disabled={busy} onClick={() => void runAction(row, "release", 0, currentReservation.id)} className="rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-200 disabled:opacity-40">Освободить</button>
+                  </>}
+                  {unDelivered > 0 && <button type="button" disabled={busy || !validAmount || parsedAmount > unDelivered} onClick={() => void runAction(row, "deliver", parsedAmount)} className="rounded-lg border border-sky-500/60 px-3 py-2 text-sm text-sky-200 disabled:opacity-40">Отметить доставку</button>}
+                </div>}
+
+                {canModerate && row.reservations.some((reservation) => reservation.gatheredQty > 0) && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-800 pt-3 text-xs">
+                  <span className="text-amber-200">Коррекция сбора:</span>
+                  {row.reservations.filter((reservation) => reservation.gatheredQty > 0 || !reservation.releasedAt).map((reservation) => <div key={reservation.id} className="flex flex-wrap items-center gap-1 rounded-lg bg-slate-900 p-2"><span className="mr-1 text-slate-300">{reservation.user.minecraftNickname}</span><button type="button" disabled={busy || !validAmount} onClick={() => void runAction(row, "correct", parsedAmount, reservation.id, reservation.userId, "add")} className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40">+ собрать</button><button type="button" disabled={busy || !validAmount || parsedAmount > reservation.gatheredQty} onClick={() => void runAction(row, "correct", parsedAmount, reservation.id, reservation.userId, "remove")} className="rounded border border-slate-700 px-2 py-1 disabled:opacity-40">− убрать</button></div>)}
+                </div>}
+              </article>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }

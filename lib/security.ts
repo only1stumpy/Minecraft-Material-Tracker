@@ -31,8 +31,14 @@ export async function clearLoginRateLimit(identifier: string) {
 
 export function validateSameOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  if (!origin) return true;
-  try { return new URL(origin).host === new URL(request.url).host; } catch { return false; }
+  if (origin) {
+    try { return new URL(origin).host === new URL(request.url).host; } catch { return false; }
+  }
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try { return new URL(referer).host === new URL(request.url).host; } catch { return false; }
+  }
+  return request.headers.get("sec-fetch-site") === "same-origin";
 }
 
 export function forbidden(message = "Недостаточно прав") {
