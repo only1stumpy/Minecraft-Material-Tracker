@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { createSession, getCurrentUser } from "@/lib/auth";
 import { hashPassword, validatePassword, verifyPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 export async function POST(request: Request) {
   if (!validateSameOrigin(request)) return NextResponse.json({ error: "Недопустимый запрос" }, { status: 403 });
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
+  const rateLimit = await checkMutationRateLimit("password-change", user.id, { limit: 5, windowMs: 60 * 60_000 });
+  if (rateLimit) return rateLimit;
   const body = await request.json().catch(() => null) as { currentPassword?: unknown; newPassword?: unknown } | null;
   const current = typeof body?.currentPassword === "string" ? body.currentPassword : "";
   const next = typeof body?.newPassword === "string" ? body.newPassword : "";

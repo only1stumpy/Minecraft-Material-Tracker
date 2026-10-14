@@ -8,7 +8,7 @@ import { validateSchematic } from "@/lib/nbt";
 import { canManageBuilding, canModerateContent } from "@/lib/permissions";
 import { getVerifiedOwnedUpload } from "@/lib/private-uploads";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 const STATUSES = ["DRAFT", "PLANNED", "COLLECTING", "READY", "BUILDING", "COMPLETED", "PAUSED", "ARCHIVED"] as const;
 type RequestBody = Record<string, unknown> & {
@@ -58,7 +58,7 @@ async function verifyAsset(pathname: unknown, userId: string, kind: "schematic" 
 function snapshotOf(building: {
   name: string; description: string | null; x: number | null; y: number | null; z: number | null;
   status: BuildingStatus; schematicFileName: string | null; schematicPath: string | null; screenshotPath: string | null;
-  ownerId: string | null; responsibleId: string | null; materials: Array<{ name: string; normalizedName: string; requiredQty: number; stackSize: number; allowSurplus: boolean; isArchived: boolean; sortOrder: number }>;
+  ownerId: string | null; responsibleId: string | null; materials: Array<{ name: string; normalizedName: string; requiredQty: number; stackSize: number; surplusLimit: number; isArchived: boolean; sortOrder: number }>;
 }): Prisma.InputJsonObject {
   return {
     name: building.name,
@@ -70,7 +70,7 @@ function snapshotOf(building: {
     screenshotPath: building.screenshotPath,
     ownerId: building.ownerId,
     responsibleId: building.responsibleId,
-    materials: building.materials.map(({ name, normalizedName, requiredQty, stackSize, allowSurplus, isArchived, sortOrder }) => ({ name, normalizedName, requiredQty, stackSize, allowSurplus, isArchived, sortOrder })),
+    materials: building.materials.map(({ name, normalizedName, requiredQty, stackSize, surplusLimit, isArchived, sortOrder }) => ({ name, normalizedName, requiredQty, stackSize, surplusLimit, isArchived, sortOrder })),
   };
 }
 
@@ -79,6 +79,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const actor = await getCurrentUser();
   if (!actor) return fail("Требуется авторизация", 401);
   if (actor.mustChangePassword) return fail("Сначала смените временный пароль", 403);
+  const rateLimit = await checkMutationRateLimit("building-update", actor.id, { limit: 60, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
 
   const { id } = await params;
   const body = await request.json().catch(() => null) as RequestBody | null;
@@ -153,7 +155,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           await tx.material.upsert({
             where: { buildingId_normalizedName: { buildingId: id, normalizedName: row.normalizedName } },
             create: { buildingId: id, ...row, sortOrder, isArchived: false },
-            update: { name: row.name, requiredQty: row.requiredQty, stackSize: row.stackSize, allowSurplus: row.allowSurplus, sortOrder, isArchived: false },
+            update: { name: row.name, requiredQty: row.requiredQty, stackSize: row.stackSize, surplusLimit: row.surplusLimit, sortOrder, isArchived: false },
           });
         }
       }

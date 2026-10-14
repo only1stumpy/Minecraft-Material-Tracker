@@ -6,6 +6,7 @@ import BuildingCatalog, {
 } from "@/components/BuildingCatalog";
 import { requireReadyUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { normalizeQuantity, type QuantityValue } from "@/lib/quantity-values";
 
 export const dynamic = "force-dynamic";
 
@@ -40,10 +41,10 @@ type CatalogQueryRow = {
   z: number | null;
   ownerNickname: string | null;
   screenshotPath: string | null;
-  requiredQty: number;
-  gatheredQty: number;
-  deliveredQty: number;
-  participantCount: number;
+  requiredQty: string;
+  gatheredQty: string;
+  deliveredQty: string;
+  participantCount: string;
   isFavorite: boolean;
 };
 
@@ -104,14 +105,26 @@ const buildWhereSql = ({
   if (status) conditions.push(Prisma.sql`b."status" = ${status}::"BuildingStatus"`);
   if (mine) conditions.push(Prisma.sql`b."ownerId" = ${userId}`);
   if (participated) {
-    conditions.push(Prisma.sql`EXISTS (
-      SELECT 1
-      FROM "MaterialContribution" participation_filter
-      INNER JOIN "Material" participation_material
-        ON participation_material."id" = participation_filter."materialId"
-      WHERE participation_material."buildingId" = b."id"
-        AND participation_material."isArchived" = false
-        AND participation_filter."userId" = ${userId}
+    conditions.push(Prisma.sql`(
+      EXISTS (
+        SELECT 1
+        FROM "MaterialContribution" participation_filter
+        INNER JOIN "Material" participation_material
+          ON participation_material."id" = participation_filter."materialId"
+        WHERE participation_material."buildingId" = b."id"
+          AND participation_material."isArchived" = false
+          AND participation_filter."userId" = ${userId}
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM "MaterialReservation" participation_reservation
+        INNER JOIN "Material" participation_reserved_material
+          ON participation_reserved_material."id" = participation_reservation."materialId"
+        WHERE participation_reserved_material."buildingId" = b."id"
+          AND participation_reserved_material."isArchived" = false
+          AND participation_reservation."userId" = ${userId}
+          AND participation_reservation."releasedAt" IS NULL
+      )
     )`);
   }
   if (favorites) {
@@ -192,10 +205,10 @@ export default async function Home({
       b."z",
       owner."minecraftNickname" AS "ownerNickname",
       b."screenshotPath",
-      COALESCE(material_totals."requiredQty", 0)::integer AS "requiredQty",
-      COALESCE(material_totals."gatheredQty", 0)::integer AS "gatheredQty",
-      COALESCE(material_totals."deliveredQty", 0)::integer AS "deliveredQty",
-      COALESCE(material_totals."participantCount", 0)::integer AS "participantCount",
+      COALESCE(material_totals."requiredQty", 0::numeric)::text AS "requiredQty",
+      COALESCE(material_totals."gatheredQty", 0::numeric)::text AS "gatheredQty",
+      COALESCE(material_totals."deliveredQty", 0::numeric)::text AS "deliveredQty",
+      COALESCE(participant_totals."participantCount", '0') AS "participantCount",
       EXISTS (
         SELECT 1 FROM "Favorite" favorite_row
         WHERE favorite_row."buildingId" = b."id" AND favorite_row."userId" = ${user.id}
@@ -226,15 +239,15 @@ export default async function Home({
              COALESCE(contribution."deliveredQty", 0) AS "deliveredQty",
              COALESCE(contribution."participantCount", 0) AS "participantCount"
       FROM (
-        SELECT "buildingId", SUM("requiredQty") AS "requiredQty"
+        SELECT "buildingId", SUM("requiredQty"::numeric) AS "requiredQty"
         FROM "Material"
         WHERE "isArchived" = false
         GROUP BY "buildingId"
       ) required
       LEFT JOIN (
         SELECT material."buildingId",
-               COALESCE(SUM(contribution."gatheredQty"), 0) AS "gatheredQty",
-               COALESCE(SUM(contribution."deliveredQty"), 0) AS "deliveredQty",
+               COALESCE(SUM(contribution."gatheredQty"::numeric), 0::numeric) AS "gatheredQty",
+               COALESCE(SUM(contribution."deliveredQty"::numeric), 0::numeric) AS "deliveredQty",
                COUNT(DISTINCT contribution."userId") FILTER (WHERE contribution."gatheredQty" > 0) AS "participantCount"
         FROM "Material" material
         LEFT JOIN "MaterialContribution" contribution ON contribution."materialId" = material."id"
@@ -242,6 +255,21 @@ export default async function Home({
         GROUP BY material."buildingId"
       ) contribution ON contribution."buildingId" = required."buildingId"
     ) material_totals ON material_totals."buildingId" = b."id"
+    LEFT JOIN (
+      SELECT participants."buildingId", COUNT(DISTINCT participants."userId")::text AS "participantCount"
+      FROM (
+        SELECT material."buildingId", contribution."userId"
+        FROM "Material" material
+        INNER JOIN "MaterialContribution" contribution ON contribution."materialId" = material."id"
+        WHERE material."isArchived" = false AND contribution."gatheredQty" > 0
+        UNION
+        SELECT material."buildingId", reservation."userId"
+        FROM "Material" material
+        INNER JOIN "MaterialReservation" reservation ON reservation."materialId" = material."id"
+        WHERE material."isArchived" = false AND reservation."releasedAt" IS NULL
+      ) participants
+      GROUP BY participants."buildingId"
+    ) participant_totals ON participant_totals."buildingId" = b."id"
     WHERE ${whereSql}
     ORDER BY ${orderBy}
     LIMIT ${PAGE_SIZE} OFFSET ${offset}
@@ -259,10 +287,10 @@ export default async function Home({
     z: row.z,
     ownerNickname: row.ownerNickname,
     screenshotPath: row.screenshotPath,
-    requiredQty: row.requiredQty,
-    gatheredQty: row.gatheredQty,
-    deliveredQty: row.deliveredQty,
-    participantCount: row.participantCount,
+    requiredQty: normalizeQuantity(row.requiredQty) as QuantityValue,
+    gatheredQty: normalizeQuantity(row.gatheredQty) as QuantityValue,
+    deliveredQty: normalizeQuantity(row.deliveredQty) as QuantityValue,
+    participantCount: normalizeQuantity(row.participantCount) as QuantityValue,
     isFavorite: row.isFavorite,
   }));
 

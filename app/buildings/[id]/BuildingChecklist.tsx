@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { breakdownMaterial, integerPercentComplete } from "@/lib/materials";
+import { breakdownMaterial } from "@/lib/materials";
+import { materialProgressStatusLabel, summarizeMaterialProgress } from "@/lib/material-operations";
 
 type Contribution = {
   userId: string;
@@ -26,7 +27,7 @@ type ChecklistMaterial = {
   name: string;
   requiredQty: number;
   stackSize: number;
-  allowSurplus: boolean;
+  surplusLimit: number;
   sortOrder: number;
   contributions: Contribution[];
   reservations: Reservation[];
@@ -58,14 +59,14 @@ const numberFormatter = new Intl.NumberFormat("ru-RU");
 function quantities(row: ChecklistMaterial) {
   const gathered = row.contributions.reduce((sum, contribution) => sum + contribution.gatheredQty, 0);
   const delivered = row.contributions.reduce((sum, contribution) => sum + contribution.deliveredQty, 0);
-  const reserved = row.reservations.reduce(
-    (sum, reservation) => sum + (reservation.releasedAt ? 0 : reservation.quantity - reservation.gatheredQty),
-    0,
-  );
-  const free = row.allowSurplus ? Number.MAX_SAFE_INTEGER : Math.max(0, row.requiredQty - gathered - reserved);
-  const remaining = Math.max(0, row.requiredQty - gathered);
-  const percent = integerPercentComplete(gathered, row.requiredQty);
-  return { gathered, delivered, reserved, free, remaining, percent };
+  const progress = summarizeMaterialProgress({
+    requiredQty: row.requiredQty,
+    gatheredQty: gathered,
+    deliveredQty: delivered,
+    surplusLimit: row.surplusLimit,
+    reservations: row.reservations,
+  });
+  return { gathered, delivered, reserved: progress.reservedQty, free: progress.freeQty, remaining: progress.remainingQty, percent: progress.gatheredPercent, status: progress.status };
 }
 
 function breakdownLabel(quantity: number, stackSize: number) {
@@ -225,6 +226,7 @@ export default function BuildingChecklist({
             const validAmount = Number.isSafeInteger(parsedAmount) && parsedAmount > 0;
             const busy = busyId === row.id;
             const itemBreakdown = breakdownMaterial(row.requiredQty, row.stackSize);
+            const statusLabel = materialProgressStatusLabel(progress.status);
 
             return (
               <article key={row.id} className="glass-panel-soft rounded-2xl p-4 md:p-5">
@@ -236,8 +238,9 @@ export default function BuildingChecklist({
                     </p>
                   </div>
                   <div className="text-right text-sm">
+                    <p><span className="glass-pill rounded-full px-2 py-1 text-xs" aria-label={`Статус материала: ${statusLabel}`}>{statusLabel}</span></p>
                     <p><b className="text-rose-200">{numberFormatter.format(progress.gathered)}</b> собрано · <b className="text-sky-300">{numberFormatter.format(progress.delivered)}</b> доставлено</p>
-                    <p className="mt-1 text-slate-400">Осталось собрать: {numberFormatter.format(progress.remaining)} · свободно: {row.allowSurplus ? "без лимита" : numberFormatter.format(progress.free)}</p>
+                    <p className="mt-1 text-slate-400">Осталось по плану: {numberFormatter.format(progress.remaining)} · свободно: {numberFormatter.format(progress.free)}{row.surplusLimit > 0 ? ` · избыток до +${numberFormatter.format(row.surplusLimit)}` : ""}</p>
                   </div>
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-label={`Сбор материала ${row.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}>
@@ -249,7 +252,7 @@ export default function BuildingChecklist({
 
                 {canParticipate && <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-white/10 pt-4">
                   <label className="grid gap-1 text-xs text-slate-400">Количество<input inputMode="numeric" value={value} onChange={(event) => setAmounts((items) => ({ ...items, [row.id]: event.target.value }))} className="glass-control w-28 rounded-lg px-3 py-2 text-sm text-white" /></label>
-                  {!currentReservation && <button type="button" disabled={busy || !validAmount || (!row.allowSurplus && parsedAmount > progress.free)} onClick={() => void runAction(row, "reserve", parsedAmount)} className="glass-action-primary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Взять в работу</button>}
+                  {!currentReservation && <button type="button" disabled={busy || !validAmount || parsedAmount > progress.free} onClick={() => void runAction(row, "reserve", parsedAmount)} className="glass-action-primary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Взять в работу</button>}
                   {currentReservation && <>
                     <button type="button" disabled={busy || !validAmount || parsedAmount > currentReservation.quantity - currentReservation.gatheredQty} onClick={() => void runAction(row, "gather", parsedAmount, currentReservation.id)} className="glass-action-primary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Отметить сбор</button>
                     <button type="button" disabled={busy} onClick={() => void runAction(row, "release", 0, currentReservation.id)} className="glass-control rounded-xl px-3 py-2 text-sm text-slate-200 disabled:opacity-40">Освободить</button>

@@ -5,7 +5,7 @@ export type MaterialDraft = Readonly<{
   normalizedName: string;
   requiredQty: number;
   stackSize: number;
-  allowSurplus: boolean;
+  surplusLimit: number;
 }>;
 
 export type MaterialDraftError = Readonly<{ index: number; message: string }>;
@@ -45,12 +45,20 @@ export function parseMaterialDrafts(value: unknown, mergeDuplicates = false): Ma
       errors.push({ index, message: "Размер стака должен быть положительным целым числом" });
       return;
     }
-    const allowSurplus = item.allowSurplus === undefined ? false : item.allowSurplus;
-    if (typeof allowSurplus !== "boolean") {
-      errors.push({ index, message: "Признак избытка должен быть логическим" });
+    if (Object.prototype.hasOwnProperty.call(item, "allowSurplus")) {
+      errors.push({ index, message: "Поле allowSurplus устарело; укажите surplusLimit" });
       return;
     }
-    rows.push({ name, normalizedName, requiredQty, stackSize, allowSurplus });
+    const surplusLimit = item.surplusLimit === undefined ? 0 : item.surplusLimit;
+    if (typeof surplusLimit !== "number" || !Number.isSafeInteger(surplusLimit) || surplusLimit < 0 || surplusLimit > MAX_MATERIAL_QUANTITY) {
+      errors.push({ index, message: `Лимит избытка должен быть целым числом от 0 до ${MAX_MATERIAL_QUANTITY}` });
+      return;
+    }
+    if (surplusLimit > MAX_MATERIAL_QUANTITY - requiredQty) {
+      errors.push({ index, message: "Требуемое количество и лимит избытка вместе превышают предел хранения" });
+      return;
+    }
+    rows.push({ name, normalizedName, requiredQty, stackSize, surplusLimit });
   });
 
   const totals = new Map<string, MaterialDraft>();
@@ -64,11 +72,12 @@ export function parseMaterialDrafts(value: unknown, mergeDuplicates = false): Ma
     if (!duplicates.includes(row.normalizedName)) duplicates.push(row.normalizedName);
     if (!mergeDuplicates) continue;
     const combinedQty = existing.requiredQty + row.requiredQty;
-    if (combinedQty > MAX_MATERIAL_QUANTITY) {
+    const combinedSurplus = existing.surplusLimit + row.surplusLimit;
+    if (combinedQty > MAX_MATERIAL_QUANTITY || combinedSurplus > MAX_MATERIAL_QUANTITY - combinedQty) {
       errors.push({ index: -1, message: `Суммарное количество для «${row.name}» превышает предел хранения` });
       continue;
     }
-    totals.set(row.normalizedName, { ...existing, requiredQty: combinedQty });
+    totals.set(row.normalizedName, { ...existing, requiredQty: combinedQty, surplusLimit: combinedSurplus });
   }
 
   if (!mergeDuplicates && duplicates.length > 0) {

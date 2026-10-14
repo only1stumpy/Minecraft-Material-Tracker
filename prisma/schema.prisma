@@ -104,7 +104,7 @@ model Material {
   normalizedName String
   requiredQty    Int
   stackSize      Int                   @default(64)
-  allowSurplus   Boolean               @default(false)
+  surplusLimit   Int                   @default(0)
   isArchived     Boolean               @default(false)
   sortOrder      Int                   @default(0)
   legacySnapshot Json?
@@ -261,8 +261,10 @@ model WarehouseStock {
   normalizedName String              @unique
   stackSize      Int                 @default(64)
   quantity       Int                 @default(0)
+  reserved       Int                 @default(0)
   updatedAt      DateTime            @updatedAt
   movements      WarehouseMovement[]
+  reservations   WarehouseReservation[]
 }
 
 model WarehouseMovement {
@@ -277,6 +279,22 @@ model WarehouseMovement {
   createdAt DateTime             @default(now())
 
   @@index([stockId, createdAt])
+}
+
+model WarehouseReservation {
+  id          String         @id @default(cuid())
+  operationId String         @unique
+  stockId     String
+  stock       WarehouseStock @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quantity    Int
+  releasedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([stockId, releasedAt])
+  @@index([userId, releasedAt])
 }
 
 model ImportLog {
@@ -322,7 +340,8 @@ model User {
   sentNotifications   Notification[]          @relation("NotificationActor")
   notificationPrefs   NotificationPreference[]
   warehouseMovements  WarehouseMovement[]
-  importLogs          ImportLog[]
+  warehouseReservations WarehouseReservation[]
+  importLogs            ImportLog[]
 
   @@index([role, isBlocked])
 }

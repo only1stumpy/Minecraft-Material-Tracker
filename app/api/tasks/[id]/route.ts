@@ -3,9 +3,9 @@ import type { Prisma } from "@prisma/client";
 
 import { getCurrentUser } from "@/lib/auth";
 import { canManageBuilding } from "@/lib/permissions";
-import { createUserNotifications } from "@/lib/notifications";
+import { createUserNotifications, isTaskCompletionTransition } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 const TASK_STATUSES = ["OPEN", "IN_PROGRESS", "DONE", "CANCELLED"] as const;
 
@@ -14,12 +14,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const actor = await getCurrentUser();
   if (!actor) return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
   if (actor.mustChangePassword) return NextResponse.json({ error: "Сначала смените временный пароль" }, { status: 403 });
+  const rateLimit = await checkMutationRateLimit("task-update", actor.id, { limit: 60, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
   const { id } = await params;
   const body = await request.json().catch(() => null) as { status?: unknown; title?: unknown; description?: unknown; assigneeNickname?: unknown } | null;
   if (!body) return NextResponse.json({ error: "Некорректное тело запроса" }, { status: 400 });
   const existing = await prisma.buildingTask.findUnique({
     where: { id },
-    select: { id: true, buildingId: true, title: true, description: true, status: true, assigneeId: true, createdById: true, building: { select: { name: true, ownerId: true, deletedAt: true } } },
+    select: { id: true, buildingId: true, title: true, description: true, status: true, assigneeId: true, createdById: true, building: { select: { name: true, ownerId: true, responsibleId: true, deletedAt: true } } },
   });
   if (!existing || existing.building.deletedAt) return NextResponse.json({ error: "Задача не найдена" }, { status: 404 });
   const manager = canManageBuilding(actor, { ownerId: existing.building.ownerId });
@@ -54,16 +56,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   try {
     const task = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const current = await tx.buildingTask.findUnique({
+        where: { id },
+        select: { status: true, assigneeId: true },
+      });
+      if (!current) throw new Error("TASK_NOT_FOUND");
       const updated = await tx.buildingTask.update({ where: { id }, data: changes, select: { id: true, title: true, description: true, status: true, assigneeId: true } });
       if (updated.assigneeId && updated.assigneeId !== existing.assigneeId) await createUserNotifications(tx, {
         recipientIds: [updated.assigneeId], actorId: actor.id, kind: "BUILDING_ASSIGNED", buildingId: existing.buildingId, entityId: id,
         payload: { buildingName: existing.building.name, taskTitle: updated.title },
       });
+      if (isTaskCompletionTransition(current.status, updated.status) && (current.assigneeId || updated.assigneeId)) await createUserNotifications(tx, {
+        recipientIds: [existing.createdById, existing.building.ownerId, existing.building.responsibleId, current.assigneeId, updated.assigneeId],
+        actorId: actor.id,
+        kind: "BUILDING_STATUS_CHANGED",
+        buildingId: existing.buildingId,
+        entityId: id,
+        payload: { buildingName: existing.building.name, taskTitle: updated.title, taskStatus: updated.status, previousTaskStatus: current.status },
+      });
       await tx.auditLog.create({ data: { actorId: actor.id, action: "TASK_UPDATED", entityType: "BuildingTask", entityId: id, metadata: { status: updated.status } } });
       return updated;
     });
     return NextResponse.json({ task });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message === "TASK_NOT_FOUND") return NextResponse.json({ error: "Задача не найдена" }, { status: 404 });
+    if (typeof error === "object" && error !== null && "code" in error && String(error.code) === "P2034") {
+      return NextResponse.json({ error: "Задача изменена параллельно. Обновите её и повторите действие." }, { status: 409 });
+    }
     return NextResponse.json({ error: "Не удалось изменить задачу" }, { status: 500 });
   }
 }

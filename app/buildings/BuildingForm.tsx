@@ -7,8 +7,9 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { MAX_MATERIALS_TEXT_BYTES, normalizeMaterialName, parseMaterials } from "@/lib/materials";
+import { formatQuantity } from "@/lib/quantity-values";
 
-export type BuildingFormMaterial = { name: string; requiredQty: number; stackSize: number; allowSurplus: boolean };
+export type BuildingFormMaterial = { name: string; requiredQty: number; stackSize: number; surplusLimit: number };
 export type BuildingFormUser = { id: string; minecraftNickname: string };
 export type BuildingFormInitial = {
   id?: string;
@@ -38,6 +39,9 @@ const STATUS_OPTIONS = [
 const MAX_SCHEMATIC_BYTES = 50 * 1024 * 1024;
 const MAX_SCREENSHOT_BYTES = 8 * 1024 * 1024;
 const MAX_SCREENSHOT_INPUT_BYTES = 24 * 1024 * 1024;
+
+const schematicExtension = (file: File) => file.name.split(".").pop()?.toLowerCase() ?? "";
+const statusLabel = (value: string) => STATUS_OPTIONS.find(([option]) => option === value)?.[1] ?? value;
 
 type FormResponse = { error?: string; building?: { id: string }; duplicates?: unknown[]; materialErrors?: Array<{ index: number; message: string }> };
 
@@ -106,6 +110,9 @@ export default function BuildingForm({
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
   const [optimizingScreenshot, setOptimizingScreenshot] = useState(false);
   const [screenshotError, setScreenshotError] = useState("");
+  const [schematicError, setSchematicError] = useState("");
+  const [schematicDropActive, setSchematicDropActive] = useState(false);
+  const [screenshotDropActive, setScreenshotDropActive] = useState(false);
   const [removeSchematic, setRemoveSchematic] = useState(false);
   const [removeScreenshot, setRemoveScreenshot] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -116,6 +123,25 @@ export default function BuildingForm({
   useEffect(() => () => {
     if (screenshotPreview?.startsWith("blob:")) URL.revokeObjectURL(screenshotPreview);
   }, [screenshotPreview]);
+
+  function selectSchematic(file: File | null) {
+    setSchematicError("");
+    if (!file) {
+      setSchematicFile(null);
+      return;
+    }
+    const extension = schematicExtension(file);
+    if (extension !== "litematic" && extension !== "schem") {
+      setSchematicError("Схема должна быть .litematic или .schem.");
+      return;
+    }
+    if (file.size > MAX_SCHEMATIC_BYTES) {
+      setSchematicError("Схема превышает 50 MiB.");
+      return;
+    }
+    setSchematicFile(file);
+    setRemoveSchematic(false);
+  }
 
   async function selectScreenshot(file: File | null) {
     setScreenshotError("");
@@ -152,12 +178,24 @@ export default function BuildingForm({
     return duplicate;
   }, [materials]);
 
+  const materialTotals = useMemo(() => {
+    let required = BigInt(0);
+    let stacks = BigInt(0);
+    for (const row of materials) {
+      const quantity = Number.isSafeInteger(row.requiredQty) && row.requiredQty >= 0 ? BigInt(row.requiredQty) : BigInt(0);
+      required += quantity;
+      const stackSize = Number.isSafeInteger(row.stackSize) && row.stackSize > 0 ? BigInt(row.stackSize) : BigInt(0);
+      if (quantity > BigInt(0) && stackSize > BigInt(0)) stacks += (quantity + stackSize - BigInt(1)) / stackSize;
+    }
+    return { required, stacks };
+  }, [materials]);
+
   function parseText(text: string) {
     setMaterialsText(text);
     const parsed = parseMaterials(text);
     setParseErrors(parsed.errors);
     if (parsed.rows.length > 0) {
-      setMaterials(parsed.rows.map((row) => ({ name: row.item, requiredQty: row.total, stackSize: row.stackSize, allowSurplus: false })));
+      setMaterials(parsed.rows.map((row) => ({ name: row.item, requiredQty: row.total, stackSize: row.stackSize, surplusLimit: 0 })));
       setSelectedRows([]);
     }
   }
@@ -178,7 +216,7 @@ export default function BuildingForm({
   }
 
   function addMaterial() {
-    setMaterials((rows) => [...rows, { name: "", requiredQty: 0, stackSize: 64, allowSurplus: false }]);
+    setMaterials((rows) => [...rows, { name: "", requiredQty: 0, stackSize: 64, surplusLimit: 0 }]);
   }
 
   function mergeDuplicates() {
@@ -187,7 +225,7 @@ export default function BuildingForm({
     for (const row of materials) {
       const key = normalizeMaterialName(row.name);
       const old = merged.get(key);
-      merged.set(key, old ? { ...old, requiredQty: old.requiredQty + row.requiredQty, allowSurplus: old.allowSurplus || row.allowSurplus } : row);
+      merged.set(key, old ? { ...old, requiredQty: old.requiredQty + row.requiredQty, surplusLimit: old.surplusLimit + row.surplusLimit } : row);
     }
     setMaterials([...merged.values()]);
   }
@@ -217,6 +255,10 @@ export default function BuildingForm({
     event.preventDefault();
     setError("");
     setSuccess("");
+    if (schematicError) {
+      setError(schematicError);
+      return;
+    }
     if (parseErrors.length) {
       setError("Сначала исправьте проблемные строки исходного файла материалов.");
       return;
@@ -230,7 +272,7 @@ export default function BuildingForm({
       return;
     }
     if (schematicFile) {
-      const ext = schematicFile.name.split(".").pop()?.toLowerCase();
+      const ext = schematicExtension(schematicFile);
       if (ext !== "litematic" && ext !== "schem") { setError("Схема должна быть .litematic или .schem."); return; }
       if (schematicFile.size > MAX_SCHEMATIC_BYTES) { setError("Схема превышает 50 MiB."); return; }
       if (hasProgress && !window.confirm("Заменить схему? Текущий сбор материалов сохранится.")) return;
@@ -296,8 +338,51 @@ export default function BuildingForm({
   }
 
   const ownerName = assignableUsers.find((candidate) => candidate.id === ownerId)?.minecraftNickname;
+  const previewScreenshotSource = !removeScreenshot
+    ? screenshotPreview ?? (initial.screenshotPath ? `/api/files/${initial.screenshotPath.split("/").map(encodeURIComponent).join("/")}` : initial.legacyScreenshotDataUrl ?? null)
+    : null;
+  const previewSchematicName = schematicFile?.name ?? (removeSchematic ? "Будет удалена" : initial.schematicFileName ?? "Не прикреплена");
+  const previewScreenshotName = screenshotFile?.name ?? (removeScreenshot ? "Будет удалён" : initial.screenshotPath || initial.legacyScreenshotDataUrl ? "Текущий скриншот" : "Не прикреплён");
+  const previewMaterialsFileName = materialsFileName || "Добавлены вручную";
 
   return <form onSubmit={submit} className="glass-panel space-y-8 rounded-[2rem] p-5 md:p-8">
+    <section aria-labelledby="building-preview-heading" className="glass-panel-soft space-y-4 rounded-3xl p-4 md:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="glass-eyebrow">Предпросмотр</p>
+          <h2 id="building-preview-heading" className="mt-2 text-xl font-semibold text-white">Карточка постройки</h2>
+          <p id="building-preview-description" className="mt-1 text-sm text-slate-400">Здесь показаны несохранённые данные. Предпросмотр доступен только для чтения.</p>
+        </div>
+        <span className="glass-pill rounded-full px-3 py-1 text-xs font-semibold text-rose-100">{statusLabel(status)}</span>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(15rem,0.7fr)]">
+        <article aria-describedby="building-preview-description" className="overflow-hidden rounded-2xl border border-white/10 bg-black/15">
+          {previewScreenshotSource ? <Image src={previewScreenshotSource} alt={`Предпросмотр скриншота: ${name.trim() || "постройки"}`} width={1600} height={900} unoptimized className="max-h-64 w-full object-cover" /> : <div role="img" aria-label="Скриншот не добавлен" className="flex min-h-36 items-center justify-center border-b border-white/10 bg-slate-950/40 px-4 text-center text-sm text-slate-500">Скриншот пока не добавлен</div>}
+          <div className="space-y-3 p-4">
+            <h3 className="text-2xl font-semibold text-white">{name.trim() || "Без названия"}</h3>
+            <p className="min-h-5 whitespace-pre-wrap text-sm text-slate-300">{description.trim() || "Описание пока не добавлено."}</p>
+            <dl className="grid gap-2 text-xs text-slate-400 sm:grid-cols-2">
+              <div><dt className="text-slate-500">Владелец</dt><dd className="text-slate-200">{ownerName ?? (ownerId ? "Назначенный пользователь" : "Не назначен")}</dd></div>
+              <div><dt className="text-slate-500">Ответственный</dt><dd className="text-slate-200">{assignableUsers.find((candidate) => candidate.id === responsibleId)?.minecraftNickname ?? (responsibleId ? "Назначенный пользователь" : "Не назначен")}</dd></div>
+              <div className="sm:col-span-2"><dt className="text-slate-500">Координаты</dt><dd className="text-slate-200">{[x, y, z].some((value) => value.trim() !== "") ? `${x || "—"}, ${y || "—"}, ${z || "—"}` : "Не указаны"}</dd></div>
+            </dl>
+          </div>
+        </article>
+        <aside aria-label="Сводка предпросмотра" className="rounded-2xl border border-white/10 bg-black/15 p-4">
+          <h3 className="text-sm font-semibold text-slate-200">Сводка</h3>
+          <dl className="mt-3 space-y-3 text-sm">
+            <div className="flex items-baseline justify-between gap-3"><dt className="text-slate-400">Позиций материалов</dt><dd className="font-semibold text-white">{materials.length}</dd></div>
+            <div className="flex items-baseline justify-between gap-3"><dt className="text-slate-400">Всего единиц</dt><dd className="font-semibold text-white">{formatQuantity(materialTotals.required)}</dd></div>
+            <div className="flex items-baseline justify-between gap-3"><dt className="text-slate-400">Стаков</dt><dd className="font-semibold text-white">{formatQuantity(materialTotals.stacks)}</dd></div>
+          </dl>
+          <div className="mt-4 space-y-2 border-t border-white/10 pt-4 text-xs text-slate-400">
+            <p><span className="text-slate-500">Схема:</span> {previewSchematicName}</p>
+            <p><span className="text-slate-500">Скриншот:</span> {previewScreenshotName}</p>
+            <p><span className="text-slate-500">Список материалов:</span> {previewMaterialsFileName}</p>
+          </div>
+        </aside>
+      </div>
+    </section>
     <div className="grid gap-5 md:grid-cols-2">
       <label className="grid gap-2 text-sm text-slate-300">Название постройки<input required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} className="glass-control rounded-2xl px-4 py-3 text-white" /></label>
       <label className="grid gap-2 text-sm text-slate-300">Статус<select value={status} onChange={(event) => setStatus(event.target.value)} className="glass-control rounded-2xl px-4 py-3 text-white">{STATUS_OPTIONS.filter(([value]) => initial.id || value === "DRAFT" || value === "PLANNED").map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -315,14 +400,28 @@ export default function BuildingForm({
     <section className="space-y-4 border-t border-white/10 pt-7">
       <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-semibold text-white">Схема и скриншот</h2><p className="mt-1 text-sm text-slate-400">Файлы хранятся приватно; схему можно заменить без сброса прогресса.</p></div></div>
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="glass-panel-soft space-y-2 rounded-2xl p-4"><label className="grid gap-2 text-sm text-slate-300">Схема .litematic / .schem (до 50 MiB)<input type="file" accept=".litematic,.schem" onChange={(event) => setSchematicFile(event.target.files?.[0] ?? null)} className="text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-slate-100" /></label>{initial.schematicFileName && !removeSchematic && <p className="text-xs text-slate-400">Сейчас: {initial.schematicFileName}</p>}{initial.schematicPath && <button type="button" onClick={() => setRemoveSchematic((value) => !value)} className="text-xs text-rose-300 hover:underline">{removeSchematic ? "Оставить текущую схему" : "Убрать схему"}</button>}</div>
         <div
-          className="glass-panel-soft space-y-3 rounded-2xl border-dashed border-rose-200/30 p-4"
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => { event.preventDefault(); void selectScreenshot(event.dataTransfer.files[0] ?? null); }}
+          className={`glass-panel-soft space-y-2 rounded-2xl border-dashed p-4 transition ${schematicDropActive ? "border-rose-300/70 bg-rose-950/20" : "border-rose-200/30"}`}
+          onDragEnter={(event) => { event.preventDefault(); setSchematicDropActive(true); }}
+          onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setSchematicDropActive(true); }}
+          onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSchematicDropActive(false); }}
+          onDrop={(event) => { event.preventDefault(); setSchematicDropActive(false); selectSchematic(event.dataTransfer.files[0] ?? null); }}
         >
-          <label className="grid cursor-pointer gap-2 text-sm text-slate-300">Скриншот PNG/JPEG/WebP · до 8 MiB после оптимизации · перетащите файл сюда
-            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void selectScreenshot(event.target.files?.[0] ?? null)} className="text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-slate-100" />
+          <label className="grid cursor-pointer gap-2 text-sm text-slate-300" htmlFor="building-schematic-file">Схема .litematic / .schem (до 50 MiB)<span className="text-xs text-slate-500">Перетащите файл сюда или выберите его с клавиатуры</span><input id="building-schematic-file" type="file" accept=".litematic,.schem" onChange={(event) => selectSchematic(event.target.files?.[0] ?? null)} className="text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-slate-100" /></label>
+          {schematicError && <p role="alert" className="text-xs text-rose-300">{schematicError}</p>}
+          {schematicFile && <p className="text-xs text-rose-100">Новый файл: {schematicFile.name} · {(schematicFile.size / 1024 / 1024).toFixed(1)} MiB</p>}
+          {initial.schematicFileName && !removeSchematic && <p className="text-xs text-slate-400">Сейчас: {initial.schematicFileName}</p>}
+          {initial.schematicPath && <button type="button" onClick={() => setRemoveSchematic((value) => !value)} className="w-fit text-xs text-rose-300 hover:underline">{removeSchematic ? "Оставить текущую схему" : "Убрать схему"}</button>}
+        </div>
+        <div
+          className={`glass-panel-soft space-y-3 rounded-2xl border-dashed p-4 transition ${screenshotDropActive ? "border-rose-300/70 bg-rose-950/20" : "border-rose-200/30"}`}
+          onDragEnter={(event) => { event.preventDefault(); setScreenshotDropActive(true); }}
+          onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setScreenshotDropActive(true); }}
+          onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setScreenshotDropActive(false); }}
+          onDrop={(event) => { event.preventDefault(); setScreenshotDropActive(false); void selectScreenshot(event.dataTransfer.files[0] ?? null); }}
+        >
+          <label className="grid cursor-pointer gap-2 text-sm text-slate-300" htmlFor="building-screenshot-file">Скриншот PNG/JPEG/WebP · до 8 MiB после оптимизации<span className="text-xs text-slate-500">Перетащите файл сюда или выберите его с клавиатуры</span>
+            <input id="building-screenshot-file" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void selectScreenshot(event.target.files?.[0] ?? null)} className="text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-slate-100" />
           </label>
           {optimizingScreenshot && <p role="status" className="text-xs text-slate-400">Оптимизируем скриншот…</p>}
           {screenshotError && <p role="alert" className="text-xs text-rose-300">{screenshotError}</p>}
@@ -339,7 +438,7 @@ export default function BuildingForm({
       <label className="grid gap-2 text-sm text-slate-300">Вставить / изменить исходный текст<textarea value={materialsText} onChange={(event) => parseText(event.target.value)} rows={7} className="glass-control rounded-2xl px-4 py-3 font-mono text-xs text-white" placeholder="| Item | Total | Missing | Available |" /></label>
       {parseErrors.length > 0 && <div role="alert" className="space-y-2 rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-200"><p>Проблемные строки: {parseErrors.length}</p><ul className="list-inside list-disc">{parseErrors.slice(0, 20).map((item, index) => <li key={`${item.line}-${index}`}>Строка {item.line || "—"}: {item.message}{item.raw && <code className="ml-2 text-xs">{item.raw.slice(0, 180)}</code>}</li>)}</ul></div>}
       <div className="flex flex-wrap gap-2"><button type="button" onClick={addMaterial} className="glass-control rounded-xl px-4 py-2 text-sm text-slate-200">+ Добавить материал вручную</button><button type="button" disabled={!selectedRows.length} onClick={removeSelected} className="rounded-xl border border-rose-500/40 px-4 py-2 text-sm text-rose-200 disabled:opacity-40">Удалить выбранные</button>{duplicateNames.size > 0 && <button type="button" onClick={mergeDuplicates} className="rounded-xl border border-amber-500/50 px-4 py-2 text-sm text-amber-100">Объединить дубли…</button>}</div>
-      {materials.length === 0 ? <p className="rounded-xl border border-dashed border-rose-200/20 p-6 text-center text-sm text-slate-500">Материалов пока нет.</p> : <div className="glass-panel-soft overflow-x-auto rounded-2xl"><table className="w-full min-w-[720px] text-left text-sm"><thead className="sticky top-0 bg-[#110d11] text-xs text-slate-400"><tr><th className="p-3"><span className="sr-only">Выбрать</span></th><th className="p-3">Материал</th><th className="p-3">Нужно</th><th className="p-3">Размер стака</th><th className="p-3">Избыток</th><th className="p-3">Удалить</th></tr></thead><tbody>{materials.map((row, index) => <tr key={`${index}-${row.name}`} className="border-t border-white/10"><td className="p-3"><input type="checkbox" aria-label={`Выбрать ${row.name || `строку ${index + 1}`}`} checked={selectedRows.includes(String(index))} onChange={(event) => setSelectedRows((selected) => event.target.checked ? [...selected, String(index)] : selected.filter((item) => item !== String(index)))} className="accent-rose-400" /></td><td className="p-3"><input aria-label="Название материала" value={row.name} onChange={(event) => setMaterial(index, { name: event.target.value })} className="glass-control w-full rounded-lg px-3 py-2" /></td><td className="p-3"><input aria-label="Требуемое количество" inputMode="numeric" value={row.requiredQty} onChange={(event) => setMaterial(index, { requiredQty: Number(event.target.value) })} className="glass-control w-28 rounded-lg px-3 py-2" /></td><td className="p-3"><input aria-label="Размер стака" inputMode="numeric" value={row.stackSize} onChange={(event) => setMaterial(index, { stackSize: Number(event.target.value) })} className="glass-control w-24 rounded-lg px-3 py-2" /></td><td className="p-3"><input type="checkbox" aria-label="Разрешить контролируемый избыток" checked={row.allowSurplus} onChange={(event) => setMaterial(index, { allowSurplus: event.target.checked })} className="accent-rose-400" /></td><td className="p-3"><button type="button" onClick={() => setMaterials((items) => items.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Удалить ${row.name || `строку ${index + 1}`}`} className="rounded-lg px-2 py-1 text-rose-300 hover:bg-rose-950">×</button></td></tr>)}</tbody></table></div>}
+      {materials.length === 0 ? <p className="rounded-xl border border-dashed border-rose-200/20 p-6 text-center text-sm text-slate-500">Материалов пока нет.</p> : <div className="glass-panel-soft overflow-x-auto rounded-2xl"><table className="w-full min-w-[760px] text-left text-sm"><thead className="sticky top-0 bg-[#110d11] text-xs text-slate-400"><tr><th className="p-3"><span className="sr-only">Выбрать</span></th><th className="p-3">Материал</th><th className="p-3">Нужно</th><th className="p-3">Размер стака</th><th className="p-3">Лимит избытка</th><th className="p-3">Удалить</th></tr></thead><tbody>{materials.map((row, index) => <tr key={`${index}-${row.name}`} className="border-t border-white/10"><td className="p-3"><input type="checkbox" aria-label={`Выбрать ${row.name || `строку ${index + 1}`}`} checked={selectedRows.includes(String(index))} onChange={(event) => setSelectedRows((selected) => event.target.checked ? [...selected, String(index)] : selected.filter((item) => item !== String(index)))} className="accent-rose-400" /></td><td className="p-3"><input aria-label="Название материала" value={row.name} onChange={(event) => setMaterial(index, { name: event.target.value })} className="glass-control w-full rounded-lg px-3 py-2" /></td><td className="p-3"><input aria-label="Требуемое количество" inputMode="numeric" value={row.requiredQty} onChange={(event) => setMaterial(index, { requiredQty: Number(event.target.value) })} className="glass-control w-28 rounded-lg px-3 py-2" /></td><td className="p-3"><input aria-label="Размер стака" inputMode="numeric" value={row.stackSize} onChange={(event) => setMaterial(index, { stackSize: Number(event.target.value) })} className="glass-control w-24 rounded-lg px-3 py-2" /></td><td className="p-3"><label className="grid gap-1"><span className="sr-only">Максимум дополнительных единиц</span><input aria-label={`Максимум дополнительных единиц для ${row.name || `строки ${index + 1}`}`} type="number" min={0} max={2_147_483_647} step={1} inputMode="numeric" value={row.surplusLimit} onChange={(event) => setMaterial(index, { surplusLimit: Number(event.target.value) })} className="glass-control w-28 rounded-lg px-3 py-2" /><span className="text-[11px] text-slate-500">0 — без избытка</span></label></td><td className="p-3"><button type="button" onClick={() => setMaterials((items) => items.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Удалить ${row.name || `строку ${index + 1}`}`} className="rounded-lg px-2 py-1 text-rose-300 hover:bg-rose-950">×</button></td></tr>)}</tbody></table></div>}
       <p className="text-xs text-slate-500">Позиции: {materials.length}. Повторное сохранение материалов не сбрасывает вклад: удалённые позиции архивируются.</p>
     </section>
 

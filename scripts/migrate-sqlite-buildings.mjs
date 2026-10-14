@@ -76,7 +76,7 @@ try {
           existing.requiredQty = sum;
           existing.legacySnapshot.push(material);
         } else {
-          grouped.set(key, { name, normalizedName: key, requiredQty: quantity, stackSize: stackValue, allowSurplus: false, legacySnapshot: [material] });
+          grouped.set(key, { name, normalizedName: key, requiredQty: quantity, stackSize: stackValue, surplusLimit: 0, legacySnapshot: [material] });
         }
       });
       validMaterials = Array.from(grouped.values());

@@ -14,7 +14,8 @@ import LiveSync from "./LiveSync";
 import { requireReadyUser } from "@/lib/auth";
 import { canManageBuilding, canModerateContent, canParticipate } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { integerPercentComplete } from "@/lib/materials";
+import { collectParticipantIds } from "@/lib/building-metrics";
+import { formatQuantity, quantityPercentComplete } from "@/lib/quantity-values";
 
 export const dynamic = "force-dynamic";
 
@@ -112,7 +113,7 @@ export default async function BuildingPage({
           name: true,
           requiredQty: true,
           stackSize: true,
-          allowSurplus: true,
+          surplusLimit: true,
           sortOrder: true,
           contributions: {
             select: {
@@ -188,11 +189,17 @@ export default async function BuildingPage({
 
   const mayManage = canManageBuilding(actor, { ownerId: building.ownerId });
   const mayModerate = canModerateContent(actor);
-  const totalRequired = building.materials.reduce((sum, item) => sum + item.requiredQty, 0);
-  const totalGathered = building.materials.reduce((sum, item) => sum + item.contributions.reduce((partial, contribution) => partial + contribution.gatheredQty, 0), 0);
-  const totalDelivered = building.materials.reduce((sum, item) => sum + item.contributions.reduce((partial, contribution) => partial + contribution.deliveredQty, 0), 0);
-  const progress = totalRequired === 0 ? 0 : integerPercentComplete(totalGathered, totalRequired);
-  const participantCount = new Set(building.materials.flatMap((item) => item.contributions.filter((contribution) => contribution.gatheredQty > 0).map((contribution) => contribution.userId))).size;
+  const totalRequired = building.materials.reduce((sum, item) => sum + BigInt(item.requiredQty), BigInt(0));
+  const totalGathered = building.materials.reduce(
+    (sum, item) => sum + item.contributions.reduce((partial, contribution) => partial + BigInt(contribution.gatheredQty), BigInt(0)),
+    BigInt(0),
+  );
+  const totalDelivered = building.materials.reduce(
+    (sum, item) => sum + item.contributions.reduce((partial, contribution) => partial + BigInt(contribution.deliveredQty), BigInt(0)),
+    BigInt(0),
+  );
+  const progress = totalRequired === BigInt(0) ? 0 : quantityPercentComplete(totalGathered, totalRequired);
+  const participantCount = collectParticipantIds(building.materials).size;
 
   return (
     <main className="min-h-screen px-4 py-8 text-slate-100 sm:px-6 md:py-12">
@@ -219,7 +226,7 @@ export default async function BuildingPage({
           </div>
           <div className="mt-7 grid gap-4 sm:grid-cols-3">
             <div className="glass-panel-soft rounded-2xl p-4"><p className="text-sm text-slate-400">Сбор материалов</p><p className="mt-1 text-2xl font-semibold">{progress}%</p><div className="mt-3 h-2 rounded-full bg-slate-800"><div className="h-2 rounded-full bg-rose-300" style={{ width: `${progress}%` }} /></div></div>
-            <div className="glass-panel-soft rounded-2xl p-4"><p className="text-sm text-slate-400">Собрано / доставлено</p><p className="mt-1 text-2xl font-semibold">{totalGathered.toLocaleString("ru-RU")} / {totalDelivered.toLocaleString("ru-RU")}</p></div>
+            <div className="glass-panel-soft rounded-2xl p-4"><p className="text-sm text-slate-400">Собрано / доставлено</p><p className="mt-1 text-2xl font-semibold">{formatQuantity(totalGathered)} / {formatQuantity(totalDelivered)}</p></div>
             <div className="glass-panel-soft rounded-2xl p-4"><p className="text-sm text-slate-400">Участники сбора</p><p className="mt-1 text-2xl font-semibold">{participantCount}</p></div>
           </div>
         </header>
