@@ -1,52 +1,44 @@
-# Antville Builder
+# Antville Builder 2.0
 
-Техническое задание на следующий крупный релиз: [Antville Builder 2.0](docs/antville-builder-2.0.md).
+Платформа совместного управления строительством Антвилля: каталог проектов, сбор и доставка материалов, задачи, комментарии, уведомления, модерация, общий склад и потребности города.
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Запуск локально
 
-## Getting Started
+Нужны Node.js 22.12+ или 24.11+, npm и PostgreSQL. Для SQLite-импорта нужен Node.js 22.13+ или 24.11+ со встроенным модулем node:sqlite.
 
-Use Node.js 20 or 22, copy `.env.example` to `.env`, and set a PostgreSQL
-`DATABASE_URL`. Then install dependencies and apply migrations:
+1. Скопируйте .env.example в .env и заполните DATABASE_URL и BLOB_READ_WRITE_TOKEN.
+2. Выполните npm install.
+3. Примените миграции командой npm run db:deploy.
+4. Создайте первого администратора: npm run admin:bootstrap -- MinecraftNick.
+5. Запустите npm run dev и откройте http://localhost:3000.
 
-```bash
-npm install
-npm run db:deploy
-npm run admin:bootstrap -- MinecraftNick
-```
+Регистрация закрыта: остальные аккаунты создаются через /admin. Временный пароль выводится один раз; передайте его игроку безопасным каналом.
 
-`npm install` automatically runs `prisma generate`, so imports from
-`@prisma/client` are ready before Next.js builds the application.
+## Основные команды
 
-Then run the development server:
+| Команда | Назначение |
+| --- | --- |
+| npm run dev | Локальная разработка |
+| npm run build | Production-сборка |
+| npm run lint | ESLint |
+| npm run typecheck | Проверка TypeScript |
+| npm test | Модульные тесты материалов, прав, импорта и NBT |
+| npm run db:deploy | Применить миграции Prisma |
+| npm run db:backup | Создать и проверить локальный PostgreSQL dump |
+| npm run db:migrate:sqlite -- /path/to/dev.db | Импортировать карточки из старой SQLite |
+| npm run admin:grant-moderator -- MinecraftNick | Выдать роль существующему игроку |
+| npm run region:measure -- fra1=https://.../api/health arn1=https://.../api/health | Сравнить задержку региона из текущей сети |
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Перед production-релизом используйте [runbook развёртывания и восстановления](docs/stage-1-operations.md). Порядок выдачи роли из Vercel production отдельно описан в [инструкции для модератора](docs/production-moderator.md).
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Архитектура и правила работы
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- PostgreSQL — источник истины; права и валидация проверяются в API.
+- Материалы, вклад игроков, резервации, доставка, задачи и версии карточек хранятся отдельно со стабильными ID.
+- Сбор обновляется атомарными сериализуемыми транзакциями. Клиент передаёт UUID операции для безопасного повтора.
+- Схемы и скриншоты хранятся в приватном Vercel Blob. Доступ выдаёт авторизованный серверный маршрут.
+- Изменения синхронизируются коротким опросом с курсором и автоматическим переподключением, без отдельного WebSocket-сервиса.
+- Импорт ограничивает размер и формат файлов. Старые JSON-материалы сохраняются как снимок рядом с нормализованными записями.
+- Секреты не хранятся в репозитории. Файл .env игнорируется Git.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Полное продуктовое ТЗ: [Antville Builder 2.0](docs/antville-builder-2.0.md). Реализация по разделам и этапам: [матрица статуса V2](docs/v2-implementation-status.md).

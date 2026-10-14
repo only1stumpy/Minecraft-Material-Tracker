@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { canModerateContent } from "@/lib/permissions";
 
 export const SESSION_COOKIE = "antville_session";
 const SESSION_DAYS = 30;
@@ -56,8 +57,14 @@ export async function requireReadyUser() {
 }
 
 export async function requireAdmin() {
-  const user = await requireUser();
+  const user = await requireReadyUser();
   if (user.role !== "ADMIN") redirect("/");
+  return user;
+}
+
+export async function requireModerator() {
+  const user = await requireReadyUser();
+  if (!canModerateContent(user)) redirect("/");
   return user;
 }
 
