@@ -32,6 +32,17 @@ export default async function ProfilePage({
   searchParams: Promise<PageSearchParams>;
 }) {
   const user = await requireUser();
+
+  if (user.mustChangePassword) {
+    return (
+      <main className="min-h-screen px-4 py-6 text-white sm:px-6 lg:px-8">
+        <div className="mx-auto flex min-h-[calc(100dvh_-_3rem)] max-w-5xl items-center justify-center">
+          <ProfileActions nickname={user.minecraftNickname} mustChangePassword />
+        </div>
+      </main>
+    );
+  }
+
   const params = await searchParams;
   const activityPage = parseProfileActivityPage(params.activityPage);
   const [createdBuildings, involvedBuildings, contributionTotals, completedTasks, activityRows, auditCount] = await Promise.all([
@@ -68,7 +79,6 @@ export default async function ProfilePage({
   return <main className="min-h-screen px-4 py-10 text-white sm:px-6 lg:px-8"><div className="mx-auto max-w-5xl space-y-8">
     <Link href="/" className="text-sm text-rose-200 hover:text-rose-100 hover:underline">← Каталог</Link>
     <header className="glass-panel rounded-[2rem] p-6 md:p-8"><p className="glass-eyebrow">Профиль игрока</p><h1 className="mt-3 text-4xl font-semibold md:text-5xl">{user.minecraftNickname}</h1><p className="mt-2 text-[var(--muted)]">Роль: {ROLE_LABELS[user.role]}</p></header>
-    {user.mustChangePassword && <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-amber-200">Смените временный пароль перед продолжением работы.</div>}
     <section aria-label="Статистика игрока" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <Stat value={createdBuildings} label="создано построек" />
       <Stat value={involvedBuildings} label="проектов с вашим вкладом" />
