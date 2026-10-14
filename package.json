@@ -18,6 +18,7 @@
     "db:migrate:sqlite": "node scripts/migrate-sqlite-buildings.mjs",
     "admin:bootstrap": "node scripts/bootstrap-admin.mjs",
     "db:backup": "bash scripts/backup-database.sh",
+    "db:restore": "bash scripts/restore-database.sh",
     "admin:grant-moderator": "node scripts/grant-moderator.mjs",
     "region:measure": "node scripts/measure-regions.mjs",
     "prisma:generate": "prisma generate",
