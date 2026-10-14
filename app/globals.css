@@ -24,7 +24,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: var(--font-onest), Arial, sans-serif;
+  --font-display: var(--font-prata), Georgia, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -41,7 +42,7 @@ body {
   overflow-x: hidden;
   background: linear-gradient(145deg, #09070a 0%, #110b12 48%, #09070d 100%);
   color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-onest), Arial, sans-serif;
   font-optical-sizing: auto;
   line-height: 1.55;
 }
@@ -65,8 +66,18 @@ h3 {
   text-wrap: balance;
 }
 
+h1,
+h2 {
+  font-family: var(--font-prata), Georgia, serif;
+  font-weight: 400;
+}
+
+h3 {
+  font-family: var(--font-onest), Arial, sans-serif;
+}
+
 h1 {
-  letter-spacing: -0.035em;
+  letter-spacing: -0.02em;
   line-height: 1.08;
 }
 
@@ -147,8 +158,8 @@ button:active {
 .glass-eyebrow {
   color: var(--accent);
   font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.19em;
+  font-weight: 650;
+  letter-spacing: 0.11em;
   line-height: 1.3;
   text-transform: uppercase;
 }
@@ -182,43 +193,20 @@ button:active {
   display: inline-flex;
   min-width: max-content;
   align-items: center;
-  gap: 0.72rem;
   color: var(--foreground);
   text-decoration: none;
 }
 
-.site-brand-mark {
-  display: grid;
-  width: 2.65rem;
-  aspect-ratio: 1;
-  place-items: center;
-  border: 1px solid rgba(232, 165, 182, 0.38);
-  border-radius: 0.95rem;
-  background: linear-gradient(145deg, rgba(162, 53, 84, 0.3), rgba(112, 31, 58, 0.16));
-  box-shadow: inset 0 1px 0 rgba(255, 241, 245, 0.18), 0 8px 24px -16px rgba(162, 53, 84, 0.72);
-  color: #f4bdcb;
-  font-size: 1.1rem;
-  font-weight: 800;
-  letter-spacing: -0.09em;
-}
-
 .site-brand-copy {
-  display: grid;
-  gap: 0.04rem;
+  display: block;
   line-height: 1.1;
 }
 
 .site-brand-copy strong {
-  font-size: 0.92rem;
-  letter-spacing: -0.02em;
-}
-
-.site-brand-copy span {
-  color: var(--muted-strong);
-  font-size: 0.64rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-family: var(--font-prata), Georgia, serif;
+  font-size: 1.1rem;
+  font-weight: 400;
+  letter-spacing: -0.015em;
 }
 
 .site-links {
@@ -428,13 +416,8 @@ a[class*="bg-emerald-"][aria-disabled="true"] {
     border-radius: 1.25rem;
   }
 
-  .site-brand-mark {
-    width: 2.3rem;
-    border-radius: 0.8rem;
-  }
-
   .site-brand-copy strong {
-    font-size: 0.82rem;
+    font-size: 0.96rem;
   }
 
   .site-account {
