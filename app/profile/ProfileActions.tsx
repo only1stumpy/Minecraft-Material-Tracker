@@ -130,9 +130,9 @@ function RequiredPasswordDialog({
       aria-labelledby="required-password-title"
       aria-describedby="required-password-description"
       onCancel={(event) => event.preventDefault()}
-      className="fixed left-1/2 top-1/2 right-auto bottom-auto m-0 min-h-[calc(100dvh_-_2rem)] max-h-[calc(100dvh_-_2rem)] w-[calc(100vw_-_2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[2rem] border border-rose-200/30 bg-[#160d13]/[.97] p-0 text-white shadow-[0_32px_120px_rgba(104,18,52,.48)] backdrop:bg-[#070509]/90 backdrop:backdrop-blur-md"
+      className="fixed left-1/2 top-1/2 right-auto bottom-auto m-0 max-h-[calc(100dvh_-_2rem)] w-[calc(100vw_-_2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[1.5rem] border border-rose-200/30 bg-[#160d13]/[.97] p-0 text-white shadow-[0_32px_120px_rgba(104,18,52,.48)] backdrop:bg-[#070509]/90 backdrop:backdrop-blur-md"
     >
-      <div className="relative flex min-h-[calc(100dvh_-_2rem)] flex-col justify-between overflow-hidden p-6 sm:p-10 md:p-14">
+      <div className="relative overflow-hidden p-5 sm:p-8">
         <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-rose-500/20 blur-3xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -left-20 size-80 rounded-full bg-fuchsia-950/30 blur-3xl" />
 
@@ -141,28 +141,28 @@ function RequiredPasswordDialog({
             <span aria-hidden="true" className="size-2 rounded-full bg-amber-300 shadow-[0_0_14px_rgba(252,211,77,.85)]" />
             Нужно действие
           </div>
-          <h1 id="required-password-title" className="mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-rose-50 sm:text-5xl">
+          <h1 id="required-password-title" className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-rose-50 sm:text-4xl">
             Замените временный пароль
           </h1>
-          <p id="required-password-description" className="mt-5 max-w-2xl text-base leading-7 text-rose-100/75 sm:text-lg">
+          <p id="required-password-description" className="mt-3 max-w-2xl text-sm leading-6 text-rose-100/75 sm:text-base">
             Этот аккаунт получил временный пароль. Чтобы открыть каталог и рабочие разделы, сначала задайте свой пароль.
           </p>
         </div>
 
-        <form onSubmit={onSubmit} className="relative mt-10 space-y-5 rounded-3xl border border-rose-200/15 bg-black/20 p-5 sm:p-7">
+        <form onSubmit={onSubmit} className="relative mt-6 space-y-3 rounded-2xl border border-rose-200/15 bg-black/20 p-4 sm:p-5">
           <div>
             <p className="text-sm font-semibold text-rose-50">Новый пароль для {nickname}</p>
-            <p className="mt-1 text-sm text-rose-100/60">Не короче 8 символов, с буквой и цифрой.</p>
+            <p className="mt-1 text-xs text-rose-100/60">Не короче 8 символов, с буквой и цифрой.</p>
           </div>
           <label className="grid gap-2 text-sm text-rose-100/75">
             Текущий временный пароль
-            <input name="current" type="password" required autoFocus autoComplete="current-password" className="glass-control w-full rounded-xl px-4 py-3 text-base" />
+            <input name="current" type="password" required autoFocus autoComplete="current-password" className="glass-control w-full rounded-xl px-4 py-2.5 text-base" />
           </label>
           <label className="grid gap-2 text-sm text-rose-100/75">
             Новый пароль
-            <input name="next" type="password" required minLength={8} autoComplete="new-password" className="glass-control w-full rounded-xl px-4 py-3 text-base" />
+            <input name="next" type="password" required minLength={8} autoComplete="new-password" className="glass-control w-full rounded-xl px-4 py-2.5 text-base" />
           </label>
-          <button disabled={busy} className="glass-action-primary w-full rounded-xl px-5 py-3.5 text-base font-semibold disabled:cursor-wait disabled:opacity-50">
+          <button disabled={busy} className="glass-action-primary w-full rounded-xl px-5 py-2.5 text-base font-semibold disabled:cursor-wait disabled:opacity-50">
             {busy ? "Сохраняем…" : "Сохранить новый пароль"}
           </button>
           {message && <p role="alert" aria-live="polite" className="rounded-xl border border-rose-300/25 bg-rose-950/35 p-3 text-sm text-rose-100">{message}</p>}
