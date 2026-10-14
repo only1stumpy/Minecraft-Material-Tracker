@@ -43,12 +43,12 @@ BEGIN
       WHERE table_schema = current_schema() AND table_name = 'Buildings' AND column_name = 'checklist'
     ) INTO source_has_checklist;
     IF source_has_checklist THEN
-      INSERT INTO "Building" ("id", "name", "x", "y", "z", "schematicFileName", "materialsFileName", "screenshotDataUrl", "materials", "legacyChecklist", "createdAt")
-      SELECT "id", "name", "x", "y", "z", "schematicFileName", "materialsFileName", "screenshotDataUrl", "materials", "checklist", "createdAt"
+      INSERT INTO "Building" ("id", "name", "x", "y", "z", "schematicFileName", "materialsFileName", "screenshotDataUrl", "materials", "legacyChecklist", "createdAt", "updatedAt")
+      SELECT "id", "name", "x", "y", "z", "schematicFileName", "materialsFileName", "screenshotDataUrl", "materials", "checklist", "createdAt", COALESCE("createdAt", CURRENT_TIMESTAMP)
       FROM "Buildings" ON CONFLICT ("id") DO NOTHING;
     ELSE
-      INSERT INTO "Building" ("id", "name", "x", "y", "z", "schematicFileName", "materialsFileName", "screenshotDataUrl", "materials", "createdAt")
-      SELECT "id", "name", "x", "y", "z", "schematicFileName", "materialsFileName", "screenshotDataUrl", "materials", "createdAt"
+      INSERT INTO "Building" ("id", "name", "x", "y", "z", "schematicFileName", "materialsFileName", "screenshotDataUrl", "materials", "createdAt", "updatedAt")
+      SELECT "id", "name", "x", "y", "z", "schematicFileName", "materialsFileName", "screenshotDataUrl", "materials", "createdAt", COALESCE("createdAt", CURRENT_TIMESTAMP)
       FROM "Buildings" ON CONFLICT ("id") DO NOTHING;
     END IF;
   END IF;

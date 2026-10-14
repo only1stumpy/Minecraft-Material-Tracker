@@ -37,7 +37,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma validate
+      - name: Prepare legacy schema and fixture
+        run: |
+          npx prisma db execute --url "$DATABASE_URL" --file prisma/migrations/20260208014420_init_buildings/migration.sql
+          npx prisma db execute --url "$DATABASE_URL" --file prisma/migrations/20260208020318_add_checklist_field/migration.sql
+          npx prisma db execute --url "$DATABASE_URL" --file test/fixtures/legacy-building.sql
+          npx prisma migrate resolve --applied 20260208014420_init_buildings
+          npx prisma migrate resolve --applied 20260208020318_add_checklist_field
       - run: npm run db:deploy
+      - name: Verify legacy building migration
+        run: node scripts/verify-legacy-migration.mjs
       - run: npm test
       - run: npm run lint
       - run: npm run typecheck
