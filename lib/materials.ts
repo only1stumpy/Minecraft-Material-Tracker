@@ -11,7 +11,6 @@ const numberFromCell = (value: string) => {
 };
 
 export const parseMaterials = (text: string) => {
-  if (text.length > 2 * 1024 * 1024) return [];
   const rows: MaterialRow[] = [];
   const lines = text.split(/\r?\n/).map((line) => line.trim());
 
@@ -31,15 +30,11 @@ export const parseMaterials = (text: string) => {
 
     const [item, total, missing, available] = parts;
 
-    const parsedTotal = numberFromCell(total);
-    const parsedMissing = numberFromCell(missing);
-    const parsedAvailable = numberFromCell(available);
-    if (![parsedTotal, parsedMissing, parsedAvailable].every(Number.isSafeInteger) || parsedTotal < 0 || parsedMissing < 0 || parsedAvailable < 0) continue;
     rows.push({
       item,
-      total: parsedTotal,
-      missing: parsedMissing,
-      available: parsedAvailable,
+      total: numberFromCell(total),
+      missing: numberFromCell(missing),
+      available: numberFromCell(available),
     });
   }
 

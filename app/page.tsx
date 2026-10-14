@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import type { MaterialRow } from "@/lib/materials";
 import { prisma } from "@/lib/prisma";
-import { requireReadyUser } from "@/lib/auth";
 
 const numberFormatter = new Intl.NumberFormat("ru-RU", {
   maximumFractionDigits: 2,
@@ -14,9 +13,7 @@ const sumMaterials = (materials: MaterialRow[]) =>
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  await requireReadyUser();
-  const buildings = await prisma.building.findMany({
-    where: { deletedAt: null },
+  const buildings = await prisma.buildings.findMany({
     orderBy: { createdAt: "desc" },
   });
 
@@ -44,13 +41,15 @@ export default async function Home() {
 
         {buildings.length === 0 ? (
           <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-8 text-sm text-slate-300">
-            Пока нет ни одной постройки. Нажмите «Добавить постройку», чтобы создать
-            первую страницу.
+            Пока нет ни одной постройки. Нажмите «Добавить постройку», чтобы
+            создать первую страницу.
           </div>
         ) : (
           <div className="grid gap-4">
             {buildings.map((building) => {
-              const totalBlocks = sumMaterials(building.materials as MaterialRow[]);
+              const totalBlocks = sumMaterials(
+                building.materials as MaterialRow[],
+              );
               return (
                 <Link
                   key={building.id}
@@ -59,7 +58,9 @@ export default async function Home() {
                 >
                   <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <h2 className="text-xl font-semibold text-white">{building.name}</h2>
+                      <h2 className="text-xl font-semibold text-white">
+                        {building.name}
+                      </h2>
                       <p className="text-sm text-slate-400">
                         Координаты: {building.x}, {building.y}, {building.z}
                       </p>

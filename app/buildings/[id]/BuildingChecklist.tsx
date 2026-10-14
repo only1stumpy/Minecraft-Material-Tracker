@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-
+import { useMemo, useState, useEffect, useRef } from "react";
 import { MaterialRow, toShulkers, toStacks } from "@/lib/materials";
 
 type ChecklistRow = MaterialRow & {
@@ -11,36 +10,85 @@ type ChecklistRow = MaterialRow & {
 
 type BuildingChecklistProps = {
   materials: MaterialRow[];
+  initialChecklist: ChecklistRow[]; // Новое: начальное состояние из БД
+  buildingId: string; // Новое: ID для API-запросов
 };
 
 const numberFormatter = new Intl.NumberFormat("ru-RU", {
   maximumFractionDigits: 2,
 });
 
-export default function BuildingChecklist({ materials }: BuildingChecklistProps) {
-  const [rows, setRows] = useState<ChecklistRow[]>(() =>
-    materials.map((row) => ({ ...row, gatheredBy: "", isGathered: false }))
-  );
+export default function BuildingChecklist({
+  materials,
+  initialChecklist,
+  buildingId,
+}: BuildingChecklistProps) {
+  // Инициализируем состояние данными из базы, если они есть, иначе создаем пустой список
+  const [rows, setRows] = useState<ChecklistRow[]>(() => {
+    if (initialChecklist && initialChecklist.length > 0) {
+      return initialChecklist;
+    }
+    return materials.map((row) => ({
+      ...row,
+      gatheredBy: "",
+      isGathered: false,
+    }));
+  });
+
+  // Реф, чтобы не сохранять данные при самом первом рендере
+  const isFirstRender = useRef(true);
+
+  // Функция для отправки данных на сервер
+  const saveProgress = async (currentRows: ChecklistRow[]) => {
+    try {
+      await fetch(`/api/buildings/${buildingId}/checklist`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checklist: currentRows }),
+      });
+    } catch (error) {
+      console.error("Ошибка при сохранении чеклиста:", error);
+    }
+  };
+
+  // Эффект дебаунса: сохраняет данные через 1 секунду после последнего изменения
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      saveProgress(rows);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [rows]);
 
   const totals = useMemo(() => {
     const totalBlocks = rows.reduce((sum, row) => sum + row.total, 0);
     const totalStacks = rows.reduce((sum, row) => sum + toStacks(row.total), 0);
-    const totalShulkers = rows.reduce((sum, row) => sum + toShulkers(row.total), 0);
+    const totalShulkers = rows.reduce(
+      (sum, row) => sum + toShulkers(row.total),
+      0,
+    );
 
     return { totalBlocks, totalStacks, totalShulkers };
   }, [rows]);
 
   const updateGatheredBy = (item: string, value: string) => {
     setRows((prev) =>
-      prev.map((row) => (row.item === item ? { ...row, gatheredBy: value } : row))
+      prev.map((row) =>
+        row.item === item ? { ...row, gatheredBy: value } : row,
+      ),
     );
   };
 
   const toggleGathered = (item: string) => {
     setRows((prev) =>
       prev.map((row) =>
-        row.item === item ? { ...row, isGathered: !row.isGathered } : row
-      )
+        row.item === item ? { ...row, isGathered: !row.isGathered } : row,
+      ),
     );
   };
 
@@ -55,9 +103,20 @@ export default function BuildingChecklist({ materials }: BuildingChecklistProps)
   return (
     <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
       <div className="flex flex-col gap-2 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
-        <span>Всего блоков: {numberFormatter.format(totals.totalBlocks)}</span>
-        <span>Всего стаков: {numberFormatter.format(totals.totalStacks)}</span>
-        <span>Всего шалкеров: {numberFormatter.format(totals.totalShulkers)}</span>
+        <div className="flex flex-wrap gap-4">
+          <span>
+            Всего блоков: {numberFormatter.format(totals.totalBlocks)}
+          </span>
+          <span>
+            Всего стаков: {numberFormatter.format(totals.totalStacks)}
+          </span>
+          <span>
+            Всего шалкеров: {numberFormatter.format(totals.totalShulkers)}
+          </span>
+        </div>
+        <div className="text-xs text-slate-500 italic">
+          Автосохранение включено
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-800">
@@ -73,26 +132,40 @@ export default function BuildingChecklist({ materials }: BuildingChecklistProps)
           {rows.map((row) => (
             <div
               key={row.item}
-              className="grid grid-cols-[0.4fr_1.6fr_0.6fr_0.6fr_0.6fr_1fr] gap-2 px-4 py-3 text-sm text-slate-200"
+              className={`grid grid-cols-[0.4fr_1.6fr_0.6fr_0.6fr_0.6fr_1fr] gap-2 px-4 py-3 text-sm transition-colors ${
+                row.isGathered
+                  ? "bg-emerald-500/5 text-slate-400"
+                  : "text-slate-200"
+              }`}
             >
-              <label className="flex items-center justify-center">
+              <label className="flex items-center justify-center cursor-pointer">
                 <input
                   type="checkbox"
                   checked={row.isGathered}
                   onChange={() => toggleGathered(row.item)}
-                  className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-emerald-400"
+                  className="h-4 w-4 rounded border-slate-600 bg-slate-950 text-emerald-400 focus:ring-0 focus:ring-offset-0"
                 />
               </label>
-              <span>{row.item}</span>
-              <span className="text-right">{numberFormatter.format(row.total)}</span>
-              <span className="text-right">{numberFormatter.format(toStacks(row.total))}</span>
-              <span className="text-right">{numberFormatter.format(toShulkers(row.total))}</span>
+              <span className={row.isGathered ? "line-through opacity-50" : ""}>
+                {row.item}
+              </span>
+              <span className="text-right font-mono text-xs">
+                {numberFormatter.format(row.total)}
+              </span>
+              <span className="text-right font-mono text-xs text-slate-400">
+                {numberFormatter.format(toStacks(row.total))}
+              </span>
+              <span className="text-right font-mono text-xs text-slate-500">
+                {numberFormatter.format(toShulkers(row.total))}
+              </span>
               <input
                 type="text"
                 value={row.gatheredBy}
-                onChange={(event) => updateGatheredBy(row.item, event.target.value)}
+                onChange={(event) =>
+                  updateGatheredBy(row.item, event.target.value)
+                }
                 placeholder="ник"
-                className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-100 outline-none transition focus:border-emerald-400/60"
+                className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-1.5 text-xs text-slate-100 outline-none transition focus:border-emerald-400/60"
               />
             </div>
           ))}

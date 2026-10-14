@@ -1,0 +1,30 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider   = "prisma-client-js"
+  output     = "../generated/prisma"
+  engineType = "client" // enable Prisma ORM without Rust
+}
+
+model Buildings {
+  id                String   @id @default(cuid())
+  name              String
+  x                 Int
+  y                 Int
+  z                 Int
+  schematicFileName String
+  materialsFileName String
+  screenshotDataUrl String?
+  materials         Json // Исходный список ресурсов (статичный)
+  checklist         Json     @default("[]") // Текущий прогресс (динамичный)
+  createdAt         DateTime @default(now())
+}

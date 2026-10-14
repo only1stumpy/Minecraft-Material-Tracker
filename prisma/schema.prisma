@@ -1,74 +1,30 @@
-generator client {
-  provider = "prisma-client-js"
-}
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-model Building {
-  id                 String   @id @default(cuid())
-  name               String
-  x                  Int
-  y                  Int
-  z                  Int
-  schematicFileName  String
-  materialsFileName  String
-  screenshotDataUrl  String?
-  materials          Json
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  ownerId            String?
-  owner              User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  deletedAt          DateTime?
-
-  @@index([ownerId])
-  @@index([deletedAt, createdAt])
+generator client {
+  provider   = "prisma-client-js"
+  output     = "../generated/prisma"
+  engineType = "client" // enable Prisma ORM without Rust
 }
 
-model User {
-  id                 String      @id @default(cuid())
-  minecraftNickname  String      @unique
-  passwordHash       String
-  role               String      @default("PLAYER")
-  isBlocked          Boolean     @default(false)
-  mustChangePassword Boolean     @default(true)
-  sessionVersion     Int         @default(0)
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-  lastActiveAt       DateTime?
-  buildings          Building[]
-  sessions           Session[]
-  auditLogs           AuditLog[] @relation("AuditActor")
-
-  @@index([role, isBlocked])
-}
-
-model Session {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  version   Int
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  lastSeenAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-model AuditLog {
-  id         String   @id @default(cuid())
-  actorId    String?
-  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
-  action     String
-  entityType String
-  entityId   String?
-  metadata   Json?
-  createdAt  DateTime @default(now())
-
-  @@index([actorId, createdAt])
-  @@index([entityType, entityId])
+model Buildings {
+  id                String   @id @default(cuid())
+  name              String
+  x                 Int
+  y                 Int
+  z                 Int
+  schematicFileName String
+  materialsFileName String
+  screenshotDataUrl String?
+  materials         Json // Исходный список ресурсов (статичный)
+  checklist         Json     @default("[]") // Текущий прогресс (динамичный)
+  createdAt         DateTime @default(now())
 }
