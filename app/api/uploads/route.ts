@@ -2,7 +2,7 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 import {
   classifyUpload,
   getUploadPolicy,
@@ -55,6 +55,8 @@ export async function POST(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
     if (user.mustChangePassword) return NextResponse.json({ error: "Сначала смените временный пароль" }, { status: 403 });
+    const rateLimit = await checkMutationRateLimit("upload-token", user.id, { limit: 120, windowMs: 60 * 60_000 });
+    if (rateLimit) return rateLimit;
     userId = user.id;
   }
 

@@ -19,7 +19,13 @@ export default async function WarehousePage() {
       normalizedName: true,
       stackSize: true,
       quantity: true,
+      reserved: true,
       updatedAt: true,
+      reservations: {
+        where: { userId: actor.id, releasedAt: null },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, operationId: true, quantity: true, createdAt: true },
+      },
       movements: {
         orderBy: { createdAt: "desc" },
         take: 5,
@@ -41,7 +47,15 @@ export default async function WarehousePage() {
     normalizedName: stock.normalizedName,
     stackSize: stock.stackSize,
     quantity: stock.quantity,
+    reserved: stock.reserved,
+    available: Math.max(0, stock.quantity - stock.reserved),
     updatedAt: stock.updatedAt.toISOString(),
+    reservations: stock.reservations.map((reservation) => ({
+      id: reservation.id,
+      operationId: reservation.operationId,
+      quantity: reservation.quantity,
+      createdAt: reservation.createdAt.toISOString(),
+    })),
     movements: stock.movements.map((movement) => ({
       id: movement.id,
       kind: movement.kind,

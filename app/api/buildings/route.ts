@@ -7,7 +7,7 @@ import { createUserNotifications } from "@/lib/notifications";
 import { validateSchematic } from "@/lib/nbt";
 import { getVerifiedOwnedUpload } from "@/lib/private-uploads";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 const BUILDING_STATUSES = ["DRAFT", "PLANNED", "COLLECTING", "READY", "BUILDING", "COMPLETED", "PAUSED", "ARCHIVED"] as const;
 const isBuildingStatus = (value: unknown): value is BuildingStatus =>
@@ -102,6 +102,8 @@ export async function POST(request: Request) {
   const actor = await getCurrentUser();
   if (!actor) return jsonError("Требуется авторизация", 401);
   if (actor.mustChangePassword) return jsonError("Сначала смените временный пароль", 403);
+  const rateLimit = await checkMutationRateLimit("building-create", actor.id, { limit: 20, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
 
   const body = await request.json().catch(() => null) as BuildingBody | null;
   if (!body) return jsonError("Некорректное тело запроса", 400);

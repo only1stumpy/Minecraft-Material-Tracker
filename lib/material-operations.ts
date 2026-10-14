@@ -1,4 +1,4 @@
-import { integerPercentComplete } from "./materials.ts";
+import { integerPercentComplete, MAX_MATERIAL_QUANTITY } from "./materials.ts";
 
 export type ReservationSlice = Readonly<{
   quantity: number;
@@ -10,7 +10,7 @@ export type MaterialProgressInput = Readonly<{
   requiredQty: number;
   gatheredQty: number;
   deliveredQty: number;
-  allowSurplus: boolean;
+  surplusLimit: number;
   reservations: readonly ReservationSlice[];
 }>;
 
@@ -22,12 +22,28 @@ export type MaterialProgress = Readonly<{
   status: "NOT_STARTED" | "IN_PROGRESS" | "PARTIAL" | "GATHERED" | "DELIVERED";
 }>;
 
+export const MATERIAL_PROGRESS_STATUS_LABELS: Record<MaterialProgress["status"], string> = {
+  NOT_STARTED: "Не начато",
+  IN_PROGRESS: "В работе",
+  PARTIAL: "Собрано частично",
+  GATHERED: "Собрано полностью",
+  DELIVERED: "Доставлено",
+};
+
+export function materialProgressStatusLabel(status: MaterialProgress["status"]) {
+  return MATERIAL_PROGRESS_STATUS_LABELS[status];
+}
+
 export function summarizeMaterialProgress(input: MaterialProgressInput): MaterialProgress {
-  const { requiredQty, gatheredQty, deliveredQty, allowSurplus, reservations } = input;
-  for (const [name, value] of Object.entries({ requiredQty, gatheredQty, deliveredQty })) {
+  const { requiredQty, gatheredQty, deliveredQty, surplusLimit, reservations } = input;
+  for (const [name, value] of Object.entries({ requiredQty, gatheredQty, deliveredQty, surplusLimit })) {
     if (!Number.isSafeInteger(value) || value < 0) {
       throw new RangeError(`${name} must be a non-negative safe integer`);
     }
+  }
+  if (requiredQty > MAX_MATERIAL_QUANTITY || surplusLimit > MAX_MATERIAL_QUANTITY
+    || surplusLimit > MAX_MATERIAL_QUANTITY - requiredQty) {
+    throw new RangeError("requiredQty plus surplusLimit exceeds the storage limit");
   }
   if (deliveredQty > gatheredQty) throw new RangeError("deliveredQty cannot exceed gatheredQty");
 
@@ -47,7 +63,7 @@ export function summarizeMaterialProgress(input: MaterialProgressInput): Materia
   }, 0);
 
   const remainingQty = Math.max(0, requiredQty - gatheredQty);
-  const freeQty = allowSurplus ? Number.MAX_SAFE_INTEGER : Math.max(0, remainingQty - reservedQty);
+  const freeQty = Math.max(0, requiredQty + surplusLimit - gatheredQty - reservedQty);
   const gatheredPercent = integerPercentComplete(gatheredQty, requiredQty);
 
   let status: MaterialProgress["status"];

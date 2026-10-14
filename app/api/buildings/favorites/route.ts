@@ -3,13 +3,15 @@ import type { Prisma } from "@prisma/client";
 
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 export async function POST(request: Request) {
   if (!validateSameOrigin(request)) return NextResponse.json({ error: "Недопустимый источник запроса" }, { status: 403 });
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
   if (user.mustChangePassword) return NextResponse.json({ error: "Сначала смените временный пароль" }, { status: 403 });
+  const rateLimit = await checkMutationRateLimit("building-favorite", user.id, { limit: 60, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
   const body = await request.json().catch(() => null) as { buildingId?: unknown; favorite?: unknown } | null;
   if (typeof body?.buildingId !== "string" || typeof body.favorite !== "boolean") return NextResponse.json({ error: "Некорректный запрос избранного" }, { status: 400 });
   const building = await prisma.building.findFirst({ where: { id: body.buildingId, deletedAt: null }, select: { id: true } });

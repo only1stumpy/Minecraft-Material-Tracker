@@ -4,13 +4,15 @@ import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { createUserNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!validateSameOrigin(request)) return NextResponse.json({ error: "Недопустимый источник запроса" }, { status: 403 });
   const actor = await getCurrentUser();
   if (!actor) return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
   if (actor.mustChangePassword) return NextResponse.json({ error: "Сначала смените временный пароль" }, { status: 403 });
+  const rateLimit = await checkMutationRateLimit("comment-create", actor.id, { limit: 20, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
 
   const { id: buildingId } = await params;
   const body = await request.json().catch(() => null) as { body?: unknown; materialId?: unknown } | null;

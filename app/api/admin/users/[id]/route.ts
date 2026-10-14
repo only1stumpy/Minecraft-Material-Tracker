@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 import { createUserNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 type UpdateBody = { action?: unknown; nickname?: unknown; role?: unknown; blocked?: unknown };
 const ROLES = ["ADMIN", "MODERATOR", "PLAYER"] as const;
@@ -15,6 +15,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const actor = await getCurrentUser();
   if (!actor) return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
   if (actor.role !== "ADMIN" || actor.mustChangePassword) return NextResponse.json({ error: "Недостаточно прав" }, { status: 403 });
+  const rateLimit = await checkMutationRateLimit("admin-user-update", actor.id, { limit: 30, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
   const { id } = await params;
   if (id === actor.id) return NextResponse.json({ error: "Меняйте собственный пароль через профиль" }, { status: 400 });
 

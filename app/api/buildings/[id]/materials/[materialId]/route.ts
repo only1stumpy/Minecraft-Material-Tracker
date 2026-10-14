@@ -6,7 +6,7 @@ import { isPositiveSafeInteger } from "@/lib/material-operations";
 import { createUserNotifications } from "@/lib/notifications";
 import { canModerateContent } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 type Action = "reserve" | "release" | "gather" | "deliver" | "correct";
 type CorrectionDirection = "add" | "remove";
@@ -38,6 +38,8 @@ export async function POST(
   const actor = await getCurrentUser();
   if (!actor) return errorResponse("Требуется авторизация", 401);
   if (actor.mustChangePassword) return errorResponse("Сначала смените временный пароль", 403);
+  const rateLimit = await checkMutationRateLimit("material-operation", actor.id, { limit: 120, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
 
   const { id: buildingId, materialId } = await params;
   const body = await request.json().catch(() => null) as RequestBody | null;
@@ -77,7 +79,7 @@ export async function POST(
           id: true,
           name: true,
           requiredQty: true,
-          allowSurplus: true,
+          surplusLimit: true,
           building: { select: { id: true, name: true, status: true, deletedAt: true, ownerId: true, responsibleId: true } },
         },
       });
@@ -104,7 +106,8 @@ export async function POST(
         const gatheredQty = totals._sum.gatheredQty ?? 0;
         const reservedQty = activeReservations.reduce((sum, row) => sum + row.quantity - row.gatheredQty, 0);
         if (!Number.isSafeInteger(gatheredQty) || !Number.isSafeInteger(reservedQty)) throw new OperationError("Сумма материалов превышает безопасный диапазон", 409);
-        const freeQty = material.allowSurplus ? Number.MAX_SAFE_INTEGER : Math.max(0, material.requiredQty - gatheredQty - reservedQty);
+        const capacity = material.requiredQty + material.surplusLimit;
+        const freeQty = Math.max(0, capacity - gatheredQty - reservedQty);
         if (quantity > freeQty) throw new OperationError(`Свободно только ${freeQty}`, 409);
 
         const reservation = await tx.materialReservation.create({
@@ -144,8 +147,9 @@ export async function POST(
         if (contribution && contribution.gatheredQty > MAX_INT - quantity) throw new OperationError("Ваш вклад превышает предел хранения", 409);
         if (reservation.gatheredQty > MAX_INT - quantity) throw new OperationError("Счётчик резервации превышает предел хранения", 409);
         if (!Number.isSafeInteger(nextGathered)) throw new OperationError("Сумма собранного превышает безопасный диапазон", 409);
-        if (!material.allowSurplus && nextGathered > material.requiredQty) {
-          throw new OperationError("Нельзя собрать больше требуемого количества", 409);
+        const capacity = material.requiredQty + material.surplusLimit;
+        if (nextGathered > capacity) {
+          throw new OperationError(`Нельзя собрать больше разрешённого количества (${capacity})`, 409);
         }
         await tx.materialReservation.update({ where: { id: reservation.id }, data: { gatheredQty: { increment: quantity } } });
         await tx.materialContribution.upsert({
@@ -186,8 +190,12 @@ export async function POST(
           if (quantity > reservation.quantity - reservation.gatheredQty) {
             throw new OperationError("Коррекция превысит зарезервированное количество", 409);
           }
-          if (!material.allowSurplus && currentGathered + quantity > material.requiredQty) {
-            throw new OperationError("Коррекция превысит требуемое количество", 409);
+          const totals = await tx.materialContribution.aggregate({ where: { materialId }, _sum: { gatheredQty: true } });
+          const gatheredTotal = totals._sum.gatheredQty ?? 0;
+          const nextGathered = gatheredTotal + quantity;
+          const capacity = material.requiredQty + material.surplusLimit;
+          if (!Number.isSafeInteger(nextGathered) || nextGathered > capacity) {
+            throw new OperationError(`Коррекция превысит разрешённое количество (${capacity})`, 409);
           }
           await tx.materialContribution.upsert({
             where: { materialId_userId: { materialId, userId: targetUserId } },
@@ -231,6 +239,18 @@ export async function POST(
           metadata: { buildingId, quantityDelta: delta, operationId: body.operationId as string },
         },
       });
+
+      if (activityKind === "RESERVED") {
+        const contributors = await tx.materialContribution.findMany({ where: { materialId }, select: { userId: true } });
+        await createUserNotifications(tx, {
+          recipientIds: [material.building.ownerId, material.building.responsibleId, ...contributors.map((entry) => entry.userId)],
+          actorId: actor.id,
+          kind: "MATERIAL_RESERVED",
+          buildingId,
+          entityId: materialId,
+          payload: { buildingName: material.building.name, materialName: material.name, quantity, reservationId },
+        });
+      }
 
       if (activityKind === "GATHERED" || activityKind === "DELIVERED") {
         const totals = await tx.materialContribution.aggregate({ where: { materialId }, _sum: { gatheredQty: true, deliveredQty: true } });

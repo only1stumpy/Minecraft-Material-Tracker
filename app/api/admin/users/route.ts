@@ -3,12 +3,14 @@ import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 export async function POST(request: Request) {
   if (!validateSameOrigin(request)) return NextResponse.json({ error: "Недопустимый запрос" }, { status: 403 });
   const actor = await getCurrentUser();
   if (!actor || actor.role !== "ADMIN" || actor.mustChangePassword) return NextResponse.json({ error: "Недостаточно прав" }, { status: 403 });
+  const rateLimit = await checkMutationRateLimit("admin-user-create", actor.id, { limit: 10, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
   const body = await request.json().catch(() => null) as { nickname?: unknown; role?: unknown } | null;
   const nickname = typeof body?.nickname === "string" ? body.nickname.trim() : "";
   const role = body?.role === undefined ? "PLAYER" : body.role;

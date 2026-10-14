@@ -32,7 +32,7 @@ export default async function EditBuildingPage({ params }: { params: Promise<{ i
       materials: {
         where: { isArchived: false },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-        select: { name: true, requiredQty: true, stackSize: true, allowSurplus: true },
+        select: { name: true, requiredQty: true, stackSize: true, surplusLimit: true },
       },
       _count: { select: { materials: true } },
     },

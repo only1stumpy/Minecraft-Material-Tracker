@@ -1,6 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { integerPercentComplete } from "@/lib/materials";
+import {
+  formatQuantity,
+  quantityPercentComplete,
+  quantityToBigInt,
+  subtractQuantity,
+  type QuantityValue,
+} from "@/lib/quantity-values";
 
 export type BuildingCatalogBuilding = {
   id: string;
@@ -14,10 +20,10 @@ export type BuildingCatalogBuilding = {
   z: number | null;
   ownerNickname: string | null;
   screenshotPath: string | null;
-  requiredQty: number;
-  gatheredQty: number;
-  deliveredQty: number;
-  participantCount: number;
+  requiredQty: QuantityValue;
+  gatheredQty: QuantityValue;
+  deliveredQty: QuantityValue;
+  participantCount: QuantityValue;
   isFavorite: boolean;
 };
 
@@ -59,7 +65,6 @@ const SORT_OPTIONS = [
 ] as const;
 
 const STATUS_LABELS = Object.fromEntries(BUILDING_STATUS_OPTIONS) as Record<string, string>;
-const numberFormatter = new Intl.NumberFormat("ru-RU");
 const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
   dateStyle: "medium",
   timeStyle: "short",
@@ -81,7 +86,7 @@ const formatDate = (value: string) => {
   return Number.isNaN(date.getTime()) ? "—" : dateFormatter.format(date);
 };
 
-const formatCount = (value: number) => numberFormatter.format(Math.max(0, value));
+const formatCount = (value: QuantityValue) => formatQuantity(value);
 
 const buildingCountLabel = (value: number) => {
   const absolute = Math.abs(value) % 100;
@@ -93,8 +98,8 @@ const buildingCountLabel = (value: number) => {
 };
 
 const progressFor = (building: BuildingCatalogBuilding) => {
-  if (building.requiredQty <= 0) return 0;
-  return integerPercentComplete(building.gatheredQty, building.requiredQty);
+  if (quantityToBigInt(building.requiredQty) <= BigInt(0)) return 0;
+  return quantityPercentComplete(building.gatheredQty, building.requiredQty);
 };
 
 const queryForPage = (filters: BuildingCatalogFilters, page: number) => {
@@ -229,7 +234,7 @@ function BuildingCard({ building }: { building: BuildingCatalogBuilding }) {
 
         <div className="mt-auto border-t border-slate-800 pt-4">
           <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="text-slate-300">Собрано {formatCount(building.gatheredQty)} / {formatCount(building.requiredQty)} · Осталось {formatCount(Math.max(building.requiredQty - building.gatheredQty, 0))}</span>
+            <span className="text-slate-300">Собрано {formatCount(building.gatheredQty)} / {formatCount(building.requiredQty)} · Осталось {formatCount(subtractQuantity(building.requiredQty, building.gatheredQty))}</span>
             <span className="font-semibold text-rose-200">{progress}%</span>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-label={`Собрано материалов для ${building.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>

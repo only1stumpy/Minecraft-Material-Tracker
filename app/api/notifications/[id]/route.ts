@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!validateSameOrigin(request)) {
@@ -12,6 +12,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
   if (user.mustChangePassword) return NextResponse.json({ error: "Сначала смените временный пароль" }, { status: 403 });
+  const rateLimit = await checkMutationRateLimit("notification-update", user.id, { limit: 60, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
 
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "Уведомление не найдено" }, { status: 404 });

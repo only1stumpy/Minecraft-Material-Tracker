@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { normalizeMaterialName } from "@/lib/materials";
 import { canModerateContent } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 const MAX_INT = 2_147_483_647;
 const MAX_ITEM_NAME_LENGTH = 160;
@@ -39,6 +39,7 @@ const serializeStock = (stock: {
   normalizedName: string;
   stackSize: number;
   quantity: number;
+  reserved: number;
   updatedAt: Date;
 }) => ({
   id: stock.id,
@@ -46,6 +47,8 @@ const serializeStock = (stock: {
   normalizedName: stock.normalizedName,
   stackSize: stock.stackSize,
   quantity: stock.quantity,
+  reserved: stock.reserved,
+  available: Math.max(0, stock.quantity - stock.reserved),
   updatedAt: stock.updatedAt,
 });
 
@@ -73,7 +76,13 @@ export async function GET(request: Request) {
       normalizedName: true,
       stackSize: true,
       quantity: true,
+      reserved: true,
       updatedAt: true,
+      reservations: {
+        where: { userId: actor.id, releasedAt: null },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, operationId: true, quantity: true, createdAt: true },
+      },
       movements: {
         orderBy: { createdAt: "desc" },
         take: 5,
@@ -92,6 +101,12 @@ export async function GET(request: Request) {
   return NextResponse.json({
     stocks: stocks.map((stock) => ({
       ...serializeStock(stock),
+      reservations: stock.reservations.map((reservation) => ({
+        id: reservation.id,
+        operationId: reservation.operationId,
+        quantity: reservation.quantity,
+        createdAt: reservation.createdAt,
+      })),
       movements: stock.movements.map((movement) => ({
         id: movement.id,
         kind: movement.kind,
@@ -114,6 +129,8 @@ export async function POST(request: Request) {
   if (actor.mustChangePassword) {
     return errorResponse("Сначала смените временный пароль", 403);
   }
+  const rateLimit = await checkMutationRateLimit("warehouse-movement", actor.id, { limit: 60, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
   if (!canModerateContent(actor)) {
     return errorResponse("Недостаточно прав для управления складом", 403);
   }
@@ -159,7 +176,7 @@ export async function POST(request: Request) {
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const current = await tx.warehouseStock.findUnique({
         where: { normalizedName },
-        select: { id: true, itemName: true, normalizedName: true, stackSize: true, quantity: true },
+        select: { id: true, itemName: true, normalizedName: true, stackSize: true, quantity: true, reserved: true },
       });
 
       if (kind === "USED" && !current) {
@@ -174,14 +191,19 @@ export async function POST(request: Request) {
         nextQuantity = currentQuantity + quantity;
         delta = quantity;
       } else if (kind === "USED") {
-        if (quantity > currentQuantity) {
-          throw new WarehouseOperationError("Нельзя списать больше остатка на складе", 409);
+        const availableQuantity = currentQuantity - (current?.reserved ?? 0);
+        if (quantity > availableQuantity) {
+          throw new WarehouseOperationError("Нельзя списать зарезервированный или отсутствующий остаток", 409);
         }
         nextQuantity = currentQuantity - quantity;
         delta = -quantity;
       } else {
         nextQuantity = quantity;
         delta = nextQuantity - currentQuantity;
+      }
+
+      if ((current?.reserved ?? 0) > nextQuantity) {
+        throw new WarehouseOperationError("Нельзя уменьшить остаток ниже активных резерваций", 409);
       }
 
       if (!Number.isSafeInteger(nextQuantity) || nextQuantity < 0 || nextQuantity > MAX_INT) {
@@ -192,11 +214,11 @@ export async function POST(request: Request) {
         ? await tx.warehouseStock.update({
             where: { id: current.id },
             data: { quantity: nextQuantity },
-            select: { id: true, itemName: true, normalizedName: true, stackSize: true, quantity: true, updatedAt: true },
+            select: { id: true, itemName: true, normalizedName: true, stackSize: true, quantity: true, reserved: true, updatedAt: true },
           })
         : await tx.warehouseStock.create({
-            data: { itemName: rawItemName, normalizedName, quantity: nextQuantity },
-            select: { id: true, itemName: true, normalizedName: true, stackSize: true, quantity: true, updatedAt: true },
+            data: { itemName: rawItemName, normalizedName, quantity: nextQuantity, reserved: 0 },
+            select: { id: true, itemName: true, normalizedName: true, stackSize: true, quantity: true, reserved: true, updatedAt: true },
           });
 
       const movement = await tx.warehouseMovement.create({

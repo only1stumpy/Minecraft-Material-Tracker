@@ -5,13 +5,15 @@ import { getCurrentUser } from "@/lib/auth";
 import { canManageBuilding } from "@/lib/permissions";
 import { createUserNotifications } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!validateSameOrigin(request)) return NextResponse.json({ error: "Недопустимый источник запроса" }, { status: 403 });
   const actor = await getCurrentUser();
   if (!actor) return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
   if (actor.mustChangePassword) return NextResponse.json({ error: "Сначала смените временный пароль" }, { status: 403 });
+  const rateLimit = await checkMutationRateLimit("task-create", actor.id, { limit: 30, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
   const { id: buildingId } = await params;
   const body = await request.json().catch(() => null) as { title?: unknown; description?: unknown; assigneeNickname?: unknown } | null;
   const title = typeof body?.title === "string" ? body.title.trim() : "";

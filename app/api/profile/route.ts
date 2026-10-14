@@ -3,13 +3,15 @@ import type { Prisma } from "@prisma/client";
 
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 export async function PATCH(request: Request) {
   if (!validateSameOrigin(request)) return NextResponse.json({ error: "Недопустимый источник запроса" }, { status: 403 });
   const actor = await getCurrentUser();
   if (!actor) return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
   if (actor.mustChangePassword) return NextResponse.json({ error: "Сначала смените временный пароль" }, { status: 403 });
+  const rateLimit = await checkMutationRateLimit("profile-update", actor.id, { limit: 10, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
 
   const body = await request.json().catch(() => null) as { nickname?: unknown } | null;
   const nickname = typeof body?.nickname === "string" ? body.nickname.normalize("NFKC").trim() : "";

@@ -7,7 +7,7 @@ import { canManageBuilding } from "@/lib/permissions";
 import { getVerifiedStoredUpload } from "@/lib/private-uploads";
 import { prisma } from "@/lib/prisma";
 import { validateSchematic } from "@/lib/nbt";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 const STATUSES = ["DRAFT", "PLANNED", "COLLECTING", "READY", "BUILDING", "COMPLETED", "PAUSED", "ARCHIVED"] as const;
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -20,12 +20,22 @@ function storedSnapshot(value: Prisma.JsonValue): Record<string, unknown> | null
   if (typeof value.name !== "string" || value.name.length < 1 || value.name.length > 120
     || typeof value.status !== "string" || !(STATUSES as readonly string[]).includes(value.status)
     || !materials || materials.length > 2000) return null;
-  const drafts = materials.map((row) => isRecord(row) ? {
-    name: row.name,
-    requiredQty: row.requiredQty,
-    stackSize: row.stackSize,
-    allowSurplus: row.allowSurplus,
-  } : row);
+  const drafts = materials.map((row) => {
+    if (!isRecord(row)) return row;
+    const surplusLimit = row.surplusLimit !== undefined
+      ? row.surplusLimit
+      : row.allowSurplus === undefined
+        ? 0
+        : row.allowSurplus === true && typeof row.stackSize === "number"
+          ? row.stackSize
+          : Number.NaN;
+    return {
+      name: row.name,
+      requiredQty: row.requiredQty,
+      stackSize: row.stackSize,
+      surplusLimit,
+    };
+  });
   const parsed = parseMaterialDrafts(drafts);
   if (parsed.errors.length || parsed.duplicates.length) return null;
   const materialDetails = materials.map((row, index) => {
@@ -67,6 +77,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const actor = await getCurrentUser();
   if (!actor) return fail("Требуется авторизация", 401);
   if (actor.mustChangePassword) return fail("Сначала смените временный пароль", 403);
+  const rateLimit = await checkMutationRateLimit("building-revision", actor.id, { limit: 10, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
 
   const { id } = await params;
   const body = await request.json().catch(() => null) as { revisionId?: unknown; expectedVersion?: unknown } | null;
@@ -121,7 +133,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             screenshotPath: current.screenshotPath,
             ownerId: current.ownerId,
             responsibleId: current.responsibleId,
-            materials: current.materials.map(({ name, normalizedName, requiredQty, stackSize, allowSurplus, isArchived, sortOrder }) => ({ name, normalizedName, requiredQty, stackSize, allowSurplus, isArchived, sortOrder })),
+            materials: current.materials.map(({ name, normalizedName, requiredQty, stackSize, surplusLimit, isArchived, sortOrder }) => ({ name, normalizedName, requiredQty, stackSize, surplusLimit, isArchived, sortOrder })),
           },
         },
       });
@@ -136,7 +148,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         await tx.material.upsert({
           where: { buildingId_normalizedName: { buildingId: id, normalizedName: material.normalizedName } },
           create: { buildingId: id, ...material },
-          update: { name: material.name, requiredQty: material.requiredQty, stackSize: material.stackSize, allowSurplus: material.allowSurplus, sortOrder: material.sortOrder, isArchived: material.isArchived },
+          update: { name: material.name, requiredQty: material.requiredQty, stackSize: material.stackSize, surplusLimit: material.surplusLimit, sortOrder: material.sortOrder, isArchived: material.isArchived },
         });
       }
 

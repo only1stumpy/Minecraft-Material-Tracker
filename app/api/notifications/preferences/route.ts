@@ -3,7 +3,7 @@ import type { NotificationKind as PrismaNotificationKind } from "@prisma/client"
 
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 const NOTIFICATION_KINDS = [
   "BUILDING_ASSIGNED",
@@ -33,6 +33,8 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
   if (user.mustChangePassword) return NextResponse.json({ error: "Сначала смените временный пароль" }, { status: 403 });
+  const rateLimit = await checkMutationRateLimit("notification-preference", user.id, { limit: 30, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
 
   const rows = await prisma.notificationPreference.findMany({
     where: { userId: user.id },

@@ -32,7 +32,7 @@ const statusLabels: Record<(typeof ACTIVE_STATUSES)[number], string> = {
 };
 
 export default async function CityNeedsPage() {
-  await requireReadyUser();
+  const actor = await requireReadyUser();
 
   const [materials, stocks] = await Promise.all([
     prisma.material.findMany({
@@ -48,6 +48,11 @@ export default async function CityNeedsPage() {
         requiredQty: true,
         building: { select: { id: true, name: true, status: true } },
         contributions: { select: { gatheredQty: true, deliveredQty: true } },
+        reservations: {
+          where: { userId: actor.id, releasedAt: null },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, quantity: true, gatheredQty: true },
+        },
       },
     }),
     prisma.warehouseStock.findMany({
@@ -87,6 +92,11 @@ export default async function CityNeedsPage() {
       gathered,
       delivered,
       remaining: projectRemaining,
+      reservations: material.reservations.filter((reservation) => reservation.quantity > reservation.gatheredQty).map((reservation) => ({
+        id: reservation.id,
+        quantity: reservation.quantity,
+        gatheredQty: reservation.gatheredQty,
+      })),
     });
     aggregate.set(normalizedName, current);
   }

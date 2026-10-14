@@ -4,13 +4,15 @@ import type { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { canModerateContent } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { validateSameOrigin } from "@/lib/security";
+import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!validateSameOrigin(request)) return NextResponse.json({ error: "Недопустимый источник запроса" }, { status: 403 });
   const actor = await getCurrentUser();
   if (!actor) return NextResponse.json({ error: "Требуется авторизация" }, { status: 401 });
   if (actor.mustChangePassword) return NextResponse.json({ error: "Сначала смените временный пароль" }, { status: 403 });
+  const rateLimit = await checkMutationRateLimit("comment-update", actor.id, { limit: 30, windowMs: 60_000 });
+  if (rateLimit) return rateLimit;
   const { id } = await params;
   const body = await request.json().catch(() => null) as { body?: unknown; hidden?: unknown } | null;
   const existing = await prisma.comment.findUnique({ where: { id }, select: { id: true, body: true, authorId: true, hiddenAt: true, buildingId: true } });
