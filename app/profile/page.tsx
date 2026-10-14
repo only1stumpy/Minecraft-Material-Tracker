@@ -1,0 +1,6 @@
+import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { ProfileActions } from "./ProfileActions";
+
+export const metadata = { title: "Профиль" };
+export default async function ProfilePage() { const user = await requireUser(); const [created, logs] = await Promise.all([prisma.building.count({ where: { ownerId: user.id, deletedAt: null } }), prisma.auditLog.count({ where: { actorId: user.id } })]); return <main className="min-h-screen bg-slate-950 px-6 py-12 text-white"><div className="mx-auto max-w-4xl space-y-8"><header><p className="text-emerald-300">Профиль игрока</p><h1 className="text-4xl font-semibold">{user.minecraftNickname}</h1><p className="mt-2 text-slate-400">Роль: {user.role === "ADMIN" ? "Администратор" : "Игрок"}</p></header>{user.mustChangePassword && <div className="rounded-xl border border-amber-500/50 bg-amber-500/10 p-4 text-amber-200">Смените временный пароль перед продолжением работы.</div>}<section className="grid gap-4 sm:grid-cols-2"><div className="rounded-2xl bg-slate-900 p-5"><b className="text-3xl">{created}</b><p className="text-slate-400">создано построек</p></div><div className="rounded-2xl bg-slate-900 p-5"><b className="text-3xl">{logs}</b><p className="text-slate-400">действий в истории</p></div></section><ProfileActions /></div></main>; }

@@ -1,17 +1,24 @@
 {
   "name": "antville",
   "version": "0.1.0",
+  "type": "module",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "db:deploy": "prisma migrate deploy",
+    "admin:bootstrap": "node scripts/bootstrap-admin.mjs",
+    "db:backup": "bash scripts/backup-database.sh"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^6.19.2",
     "next": "16.1.6",
+    "prisma": "^6.6.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

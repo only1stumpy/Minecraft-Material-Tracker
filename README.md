@@ -1,4 +1,8 @@
-# Antville — Minecraft Material Tracker
+# Antville Builder
+
+Техническое задание на следующий крупный релиз: [Antville Builder 2.0](docs/antville-builder-2.0.md).
+
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 Веб-сервис для учёта построек и материалов на Minecraft-сервере. Antville хранит каталог построек с привязкой к координатам мира, прикреплённой схемой [Litematica](https://www.curseforge.com/minecraft/mc-mods/litematica) и автоматически сгенерированным чек-листом материалов — со стаками, шалкерами и отметкой, кто из игроков что добыл.
 
