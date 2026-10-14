@@ -279,11 +279,20 @@ export default async function Home({
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 py-12">
-        <header className="space-y-4">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300">Antville Builder</p>
-          <h1 className="text-4xl font-semibold text-white md:text-5xl">Каталог построек Антвилля</h1>
-          <p className="max-w-3xl text-base text-slate-300 md:text-lg">Ищите проекты, следите за сбором материалов и подключайтесь к работе жителей города.</p>
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12">
+        <header className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(16rem,0.65fr)] lg:items-end">
+          <div className="space-y-4">
+            <p className="glass-eyebrow">Antville Builder · версия 2.0</p>
+            <h1 className="max-w-4xl text-4xl font-semibold text-white md:text-6xl">Строим Антвилль <span className="text-rose-200">вместе</span></h1>
+            <p className="max-w-3xl text-base text-slate-300 md:text-lg">Находите проекты, собирайте материалы и следите за ходом строительства в одном месте.</p>
+          </div>
+          <aside className="glass-panel-soft flex items-center justify-between gap-5 rounded-3xl p-5 sm:p-6" aria-label="Сводка каталога">
+            <div>
+              <p className="text-sm text-slate-400">Проекты в каталоге</p>
+              <p className="mt-1 text-3xl font-semibold tracking-tight text-white">{new Intl.NumberFormat("ru-RU").format(total)}</p>
+            </div>
+            <span className="grid size-14 shrink-0 place-items-center rounded-2xl border border-rose-200/15 bg-rose-950/50 text-2xl text-rose-200" aria-hidden="true">⌂</span>
+          </aside>
         </header>
         <BuildingCatalog buildings={buildings} filters={filters} pageCount={pageCount} total={total} />
       </main>

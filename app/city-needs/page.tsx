@@ -110,15 +110,16 @@ export default async function CityNeedsPage() {
   }).sort((left, right) => right.needed - left.needed || left.name.localeCompare(right.name, "ru"));
 
   return (
-    <main className="min-h-screen px-4 py-8 text-slate-100 sm:px-6 lg:px-8">
+    <main className="min-h-screen px-4 py-10 text-slate-100 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl space-y-7">
-        <header className="flex flex-wrap items-start justify-between gap-4">
+        <header className="glass-panel flex flex-wrap items-start justify-between gap-4 rounded-[2rem] p-6 md:p-8">
           <div>
-            <Link href="/" className="text-sm text-emerald-300 hover:underline">← В каталог</Link>
-            <h1 className="mt-3 text-4xl font-semibold text-white">Потребности города</h1>
-            <p className="mt-2 max-w-3xl text-slate-400">Остаток рассчитывается по активным постройкам. Собранное и доставленное покрытие не складываются повторно, затем вычитается общий склад.</p>
+            <Link href="/" className="text-sm text-rose-200 hover:text-rose-100 hover:underline">← В каталог</Link>
+            <p className="glass-eyebrow mt-6">Сводка ресурсов</p>
+            <h1 className="mt-2 text-4xl font-semibold text-white md:text-5xl">Потребности города</h1>
+            <p className="mt-2 max-w-3xl text-[var(--muted)]">Остаток рассчитывается по активным постройкам. Собранное и доставленное покрытие не складываются повторно, затем вычитается общий склад.</p>
           </div>
-          <Link href="/warehouse" className="rounded-full border border-emerald-500/50 px-4 py-2 text-sm text-emerald-200 hover:border-emerald-300">← Общий склад</Link>
+          <Link href="/warehouse" className="glass-control rounded-xl px-4 py-2 text-sm text-rose-100 hover:border-rose-300/70">← Общий склад</Link>
         </header>
         <CityNeedsClient initialNeeds={needs} />
       </div>

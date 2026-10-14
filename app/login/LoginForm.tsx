@@ -12,5 +12,18 @@ export function LoginForm() {
     if (!response.ok) return setError(result.error ?? "Не удалось войти");
     router.push(result.mustChangePassword ? "/profile?password=required" : "/"); router.refresh();
   }
-  return <form onSubmit={submit} className="space-y-5 rounded-3xl border border-slate-800 bg-slate-900 p-7"><label className="block text-sm text-slate-300">Minecraft-ник<input name="nickname" autoComplete="username" required className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" /></label><label className="block text-sm text-slate-300">Пароль<input name="password" type="password" autoComplete="current-password" required className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" /></label>{error && <p role="alert" className="text-sm text-rose-300">{error}</p>}<button disabled={pending} className="w-full rounded-full bg-emerald-400 px-5 py-3 font-semibold text-slate-950 disabled:opacity-50">{pending ? "Входим…" : "Войти"}</button></form>;
+  return (
+    <form onSubmit={submit} className="glass-panel space-y-5 rounded-3xl p-6 sm:p-7">
+      <label className="block text-sm font-medium text-slate-200">
+        Minecraft-ник
+        <input name="nickname" autoComplete="username" required className="glass-control mt-2 min-h-12 w-full rounded-xl px-4 py-3 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-300/25" />
+      </label>
+      <label className="block text-sm font-medium text-slate-200">
+        Пароль
+        <input name="password" type="password" autoComplete="current-password" required className="glass-control mt-2 min-h-12 w-full rounded-xl px-4 py-3 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-300/25" />
+      </label>
+      {error && <p role="alert" className="rounded-xl border border-rose-300/20 bg-rose-950/40 px-3 py-2 text-sm text-rose-100">{error}</p>}
+      <button disabled={pending} className="glass-action-primary min-h-12 w-full rounded-xl px-5 disabled:cursor-wait disabled:opacity-50">{pending ? "Входим…" : "Войти"}</button>
+    </form>
+  );
 }

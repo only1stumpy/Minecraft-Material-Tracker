@@ -140,42 +140,42 @@ export default function NotificationsClient() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-12 text-slate-100">
+    <main className="min-h-screen px-4 py-10 text-slate-100 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl space-y-8">
-        <header className="space-y-2">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-300">Центр уведомлений</p>
-          <h1 className="text-4xl font-semibold text-white">Уведомления</h1>
-          <p className="text-slate-400">Непрочитанных: {unreadCount}</p>
+        <header className="glass-panel rounded-[2rem] p-6 md:p-8">
+          <p className="glass-eyebrow">Центр уведомлений</p>
+          <h1 className="mt-3 text-4xl font-semibold text-white md:text-5xl">Уведомления</h1>
+          <p className="mt-2 text-[var(--muted)]">Непрочитанных: <span className="text-rose-100">{unreadCount}</span></p>
         </header>
 
         {error && <p role="alert" className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-rose-200">{error}</p>}
 
         <section className="space-y-4">
-          <h2 className="text-2xl font-semibold text-white">Входящие</h2>
-          {loading ? <p className="text-slate-400">Загрузка…</p> : notifications.length === 0 ? <p className="rounded-2xl border border-slate-800 bg-slate-900 p-6 text-slate-400">Новых уведомлений пока нет.</p> : (
-            <ul className="divide-y divide-slate-800 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+          <div><p className="glass-eyebrow">Лента</p><h2 className="mt-2 text-2xl font-semibold text-white">Входящие</h2></div>
+          {loading ? <p className="glass-panel-soft rounded-2xl p-6 text-[var(--muted)]">Загрузка…</p> : notifications.length === 0 ? <p className="glass-panel-soft rounded-2xl p-6 text-[var(--muted)]">Новых уведомлений пока нет.</p> : (
+            <ul className="glass-panel divide-y divide-white/8 overflow-hidden rounded-3xl">
               {notifications.map((notification) => (
-                <li key={notification.id} className={`flex flex-wrap items-center gap-4 p-5 ${notification.readAt ? "" : "bg-emerald-950/30"}`}>
+                <li key={notification.id} className={`flex flex-wrap items-center gap-4 p-5 transition ${notification.readAt ? "" : "bg-rose-950/30"}`}>
                   <div className="min-w-0 flex-1 space-y-1">
                     <p className="font-medium text-white">{notificationTitle(notification)}</p>
-                    <time dateTime={notification.createdAt} className="block text-xs text-slate-500">{new Date(notification.createdAt).toLocaleString("ru-RU")}</time>
-                    {notification.buildingId && <Link href={`/buildings/${notification.buildingId}`} className="inline-block text-sm text-emerald-300 hover:underline">Открыть постройку</Link>}
+                    <time dateTime={notification.createdAt} className="block text-xs text-[var(--muted-strong)]">{new Date(notification.createdAt).toLocaleString("ru-RU")}</time>
+                    {notification.buildingId && <Link href={`/buildings/${notification.buildingId}`} className="inline-block text-sm text-rose-200 hover:text-rose-100 hover:underline">Открыть постройку</Link>}
                   </div>
-                  {!notification.readAt && <button type="button" onClick={() => void markRead(notification.id)} className="rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-200 hover:border-emerald-400">Прочитано</button>}
+                  {!notification.readAt && <button type="button" onClick={() => void markRead(notification.id)} className="glass-control rounded-lg px-3 py-2 text-sm text-slate-200 hover:border-rose-300/70">Прочитано</button>}
                 </li>
               ))}
             </ul>
           )}
-          {hasMore && <button type="button" disabled={loadingMore} onClick={() => void loadNotifications(page + 1, true)} className="rounded-full border border-slate-600 px-5 py-2 text-sm disabled:opacity-50">{loadingMore ? "Загрузка…" : "Загрузить ещё"}</button>}
+          {hasMore && <button type="button" disabled={loadingMore} onClick={() => void loadNotifications(page + 1, true)} className="glass-control rounded-xl px-5 py-2 text-sm disabled:opacity-50">{loadingMore ? "Загрузка…" : "Загрузить ещё"}</button>}
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-2xl font-semibold text-white">Настройки уведомлений</h2>
-          <div className="divide-y divide-slate-800 rounded-2xl border border-slate-800 bg-slate-900">
+          <div><p className="glass-eyebrow">Контроль сигнала</p><h2 className="mt-2 text-2xl font-semibold text-white">Настройки уведомлений</h2></div>
+          <div className="glass-panel divide-y divide-white/8 overflow-hidden rounded-3xl">
             {NOTIFICATION_KINDS.map((kind) => {
               const preference = preferences.find((item) => item.kind === kind);
               const enabled = preference?.enabled ?? true;
-              return <label key={kind} className="flex cursor-pointer items-center justify-between gap-4 p-4"><span>{KIND_LABELS[kind]}</span><input type="checkbox" checked={enabled} disabled={savingKind === kind} onChange={(event) => void togglePreference(kind, event.target.checked)} className="h-5 w-5 accent-emerald-400" /></label>;
+              return <label key={kind} className="flex cursor-pointer items-center justify-between gap-4 p-4 transition hover:bg-white/[0.025]"><span>{KIND_LABELS[kind]}</span><input type="checkbox" checked={enabled} disabled={savingKind === kind} onChange={(event) => void togglePreference(kind, event.target.checked)} className="h-5 w-5 accent-[var(--accent-strong)]" /></label>;
             })}
           </div>
         </section>

@@ -40,9 +40,9 @@ export default function StatusEditor({ buildingId, status, expectedVersion }: { 
     }
   }
 
-  return <section className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-    <label className="grid gap-1 text-sm text-slate-400">Статус постройки<select value={value} onChange={(event) => setValue(event.target.value)} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white">{STATUSES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-    <button type="button" disabled={saving || value === status} onClick={() => void save()} className="rounded-lg bg-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-40">{saving ? "Сохраняем…" : "Сохранить статус"}</button>
+  return <section className="glass-panel-soft flex flex-wrap items-end gap-3 rounded-2xl p-4">
+    <label className="grid gap-1 text-sm text-slate-400">Статус постройки<select value={value} onChange={(event) => setValue(event.target.value)} className="glass-control rounded-xl px-3 py-2 text-white">{STATUSES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+    <button type="button" disabled={saving || value === status} onClick={() => void save()} className="glass-action-primary rounded-xl px-4 py-2 text-sm disabled:opacity-40">{saving ? "Сохраняем…" : "Сохранить статус"}</button>
     {error && <p role="alert" className="w-full text-sm text-rose-300">{error}</p>}
   </section>;
 }

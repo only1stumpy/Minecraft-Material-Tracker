@@ -112,7 +112,7 @@ const queryForPage = (filters: BuildingCatalogFilters, page: number) => {
 
 function FilterForm({ filters }: { filters: BuildingCatalogFilters }) {
   return (
-    <form action="/" method="get" className="rounded-3xl border border-slate-800 bg-slate-900/70 p-4 shadow-xl shadow-slate-950/20">
+    <form action="/" method="get" className="glass-panel rounded-3xl p-4 shadow-xl shadow-black/20 sm:p-5">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(10rem,1fr)_minmax(12rem,1fr)_auto] lg:items-end">
         <label htmlFor="catalog-q" className="grid gap-2 text-sm text-slate-300">
           Поиск
@@ -123,45 +123,45 @@ function FilterForm({ filters }: { filters: BuildingCatalogFilters }) {
             defaultValue={filters.q}
             placeholder="Название, описание или автор"
             autoComplete="off"
-            className="min-h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30"
+            className="glass-control min-h-11 rounded-xl px-3 outline-none transition placeholder:text-slate-500 focus:border-rose-300 focus:ring-2 focus:ring-rose-300/25"
           />
         </label>
 
         <label htmlFor="catalog-status" className="grid gap-2 text-sm text-slate-300">
           Статус
-          <select id="catalog-status" name="status" defaultValue={filters.status} className="min-h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30">
+          <select id="catalog-status" name="status" defaultValue={filters.status} className="glass-control min-h-11 rounded-xl px-3 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-300/25">
             {BUILDING_STATUS_OPTIONS.map(([value, label]) => <option key={value || "all"} value={value}>{label}</option>)}
           </select>
         </label>
 
         <label htmlFor="catalog-sort" className="grid gap-2 text-sm text-slate-300">
           Сортировка
-          <select id="catalog-sort" name="sort" defaultValue={filters.sort} className="min-h-11 rounded-xl border border-slate-700 bg-slate-950 px-3 text-white outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30">
+          <select id="catalog-sort" name="sort" defaultValue={filters.sort} className="glass-control min-h-11 rounded-xl px-3 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-300/25">
             {SORT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
 
-        <button type="submit" className="min-h-11 rounded-xl bg-emerald-400 px-5 font-semibold text-slate-950 transition hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:ring-offset-2 focus:ring-offset-slate-900">
+        <button type="submit" className="glass-action-primary min-h-11 rounded-xl px-5 transition focus:outline-none focus:ring-2 focus:ring-rose-200 focus:ring-offset-2 focus:ring-offset-[#110d11]">
           Применить
         </button>
       </div>
 
       <fieldset className="mt-4 flex flex-wrap gap-3 border-0 p-0">
         <legend className="sr-only">Дополнительные фильтры</legend>
-        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 px-3 text-sm text-slate-300 transition has-[:focus-visible]:border-emerald-400 has-[:checked]:border-emerald-500/70 has-[:checked]:bg-emerald-500/10">
-          <input type="checkbox" name="mine" value="1" defaultChecked={filters.mine} className="size-4 accent-emerald-400" />
+        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 px-3 text-sm text-slate-300 transition has-[:focus-visible]:border-rose-300 has-[:checked]:border-rose-300/70 has-[:checked]:bg-rose-950/40">
+          <input type="checkbox" name="mine" value="1" defaultChecked={filters.mine} className="size-4 accent-rose-300" />
           Мои постройки
         </label>
-        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 px-3 text-sm text-slate-300 transition has-[:focus-visible]:border-emerald-400 has-[:checked]:border-emerald-500/70 has-[:checked]:bg-emerald-500/10">
-          <input type="checkbox" name="participated" value="1" defaultChecked={filters.participated} className="size-4 accent-emerald-400" />
+        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 px-3 text-sm text-slate-300 transition has-[:focus-visible]:border-rose-300 has-[:checked]:border-rose-300/70 has-[:checked]:bg-rose-950/40">
+          <input type="checkbox" name="participated" value="1" defaultChecked={filters.participated} className="size-4 accent-rose-300" />
           Я участвую
         </label>
-        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 px-3 text-sm text-slate-300 transition has-[:focus-visible]:border-emerald-400 has-[:checked]:border-emerald-500/70 has-[:checked]:bg-emerald-500/10">
-          <input type="checkbox" name="favorites" value="1" defaultChecked={filters.favorites} className="size-4 accent-emerald-400" />
+        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 px-3 text-sm text-slate-300 transition has-[:focus-visible]:border-rose-300 has-[:checked]:border-rose-300/70 has-[:checked]:bg-rose-950/40">
+          <input type="checkbox" name="favorites" value="1" defaultChecked={filters.favorites} className="size-4 accent-rose-300" />
           Избранное
         </label>
-        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 px-3 text-sm text-slate-300 transition has-[:focus-visible]:border-emerald-400 has-[:checked]:border-emerald-500/70 has-[:checked]:bg-emerald-500/10">
-          <input type="checkbox" name="hideCompleted" value="1" defaultChecked={filters.hideCompleted} className="size-4 accent-emerald-400" />
+        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-700 px-3 text-sm text-slate-300 transition has-[:focus-visible]:border-rose-300 has-[:checked]:border-rose-300/70 has-[:checked]:bg-rose-950/40">
+          <input type="checkbox" name="hideCompleted" value="1" defaultChecked={filters.hideCompleted} className="size-4 accent-rose-300" />
           Скрыть завершённые
         </label>
         {(filters.q || filters.status || filters.mine || filters.participated || filters.favorites || filters.hideCompleted) && (
@@ -183,7 +183,7 @@ function BuildingCard({ building }: { building: BuildingCatalogBuilding }) {
     : null;
 
   return (
-    <article className="group flex min-w-0 flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/70 shadow-lg shadow-slate-950/20 transition hover:-translate-y-0.5 hover:border-emerald-400/60">
+    <article className="glass-panel group flex min-w-0 flex-col overflow-hidden rounded-3xl shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:border-rose-200/35">
       <Link href={`/buildings/${encodeURIComponent(building.id)}`} aria-label={`Открыть постройку «${building.name}»`} className="block h-48 overflow-hidden bg-slate-950">
         {screenshotUrl ? (
           <Image src={screenshotUrl} alt={`Скриншот постройки «${building.name}»`} width={640} height={360} unoptimized className="h-48 w-full object-cover transition duration-300 group-hover:scale-[1.02]" />
@@ -198,7 +198,7 @@ function BuildingCard({ building }: { building: BuildingCatalogBuilding }) {
       <div className="flex flex-1 flex-col gap-4 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <Link href={`/buildings/${encodeURIComponent(building.id)}`} className="break-words text-xl font-semibold text-white underline-offset-4 hover:text-emerald-300 hover:underline">
+            <Link href={`/buildings/${encodeURIComponent(building.id)}`} className="break-words text-xl font-semibold text-white underline-offset-4 hover:text-rose-200 hover:underline">
               {building.name}
             </Link>
             <p className="mt-1 text-xs text-slate-500">Создано: {formatDate(building.createdAt)} · обновлено: {formatDate(building.updatedAt)}</p>
@@ -230,10 +230,10 @@ function BuildingCard({ building }: { building: BuildingCatalogBuilding }) {
         <div className="mt-auto border-t border-slate-800 pt-4">
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="text-slate-300">Собрано {formatCount(building.gatheredQty)} / {formatCount(building.requiredQty)} · Осталось {formatCount(Math.max(building.requiredQty - building.gatheredQty, 0))}</span>
-            <span className="font-semibold text-emerald-300">{progress}%</span>
+            <span className="font-semibold text-rose-200">{progress}%</span>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-label={`Собрано материалов для ${building.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
-            <div className="h-full rounded-full bg-emerald-400 transition-[width]" style={{ width: `${progress}%` }} />
+            <div className="h-full rounded-full bg-gradient-to-r from-rose-900 to-rose-300 transition-[width]" style={{ width: `${progress}%` }} />
           </div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
             <span>Доставлено: {formatCount(building.deliveredQty)}</span>
@@ -255,13 +255,13 @@ function Pagination({ filters, pageCount }: { filters: BuildingCatalogFilters; p
   return (
     <nav aria-label="Страницы каталога" className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-5">
       {page > 1 ? (
-        <Link href={previousHref} rel="prev" className="inline-flex min-h-11 items-center rounded-xl border border-slate-700 px-4 text-sm text-slate-200 transition hover:border-emerald-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/60">
+        <Link href={previousHref} rel="prev" className="glass-control inline-flex min-h-11 items-center rounded-xl px-4 text-sm text-slate-200 transition hover:border-rose-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-rose-300/50">
           ← Назад
         </Link>
       ) : <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-xl border border-slate-800 px-4 text-sm text-slate-600">← Назад</span>}
       <span className="text-sm text-slate-400">Страница {page} из {pageCount}</span>
       {page < pageCount ? (
-        <Link href={nextHref} rel="next" className="inline-flex min-h-11 items-center rounded-xl border border-slate-700 px-4 text-sm text-slate-200 transition hover:border-emerald-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-400/60">
+        <Link href={nextHref} rel="next" className="glass-control inline-flex min-h-11 items-center rounded-xl px-4 text-sm text-slate-200 transition hover:border-rose-300 hover:text-white focus:outline-none focus:ring-2 focus:ring-rose-300/50">
           Вперёд →
         </Link>
       ) : <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-xl border border-slate-800 px-4 text-sm text-slate-600">Вперёд →</span>}
@@ -279,7 +279,7 @@ export default function BuildingCatalog({ buildings, filters, pageCount, total }
           <h2 id="catalog-heading" className="text-2xl font-semibold text-white">Каталог построек</h2>
           <p className="mt-1 text-sm text-slate-400">{total === 0 ? "Постройки не найдены" : `${formatCount(total)} ${buildingCountLabel(total)}`}</p>
         </div>
-        <Link href="/buildings/new" className="inline-flex min-h-11 items-center rounded-xl bg-emerald-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:ring-offset-2 focus:ring-offset-slate-950">
+        <Link href="/buildings/new" className="glass-action-primary inline-flex min-h-11 items-center rounded-xl px-4 text-sm transition focus:outline-none focus:ring-2 focus:ring-rose-200 focus:ring-offset-2 focus:ring-offset-[#09070a]">
           + Добавить постройку
         </Link>
       </div>
@@ -287,10 +287,10 @@ export default function BuildingCatalog({ buildings, filters, pageCount, total }
       <FilterForm filters={filters} />
 
       {buildings.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/50 px-6 py-12 text-center">
+        <div className="glass-panel-soft rounded-3xl border-dashed px-6 py-12 text-center">
           <p className="text-lg font-medium text-slate-200">{hasFilters ? "По этим фильтрам ничего не найдено" : "Пока нет ни одной постройки"}</p>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">{hasFilters ? "Измените запрос или сбросьте фильтры, чтобы увидеть другие карточки." : "Добавьте первую постройку, чтобы жители могли найти её и собрать нужные материалы."}</p>
-          {hasFilters && <Link href="/" className="mt-5 inline-flex min-h-11 items-center rounded-xl border border-emerald-500/50 px-4 text-sm text-emerald-200 transition hover:bg-emerald-500/10">Сбросить фильтры</Link>}
+          {hasFilters && <Link href="/" className="mt-5 inline-flex min-h-11 items-center rounded-xl border border-rose-200/30 bg-rose-950/35 px-4 text-sm text-rose-100 transition hover:border-rose-200/60 hover:bg-rose-950/60">Сбросить фильтры</Link>}
         </div>
       ) : (
         <>

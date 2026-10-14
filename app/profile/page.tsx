@@ -37,10 +37,10 @@ export default async function ProfilePage() {
     prisma.auditLog.count({ where: { actorId: user.id } }),
   ]);
 
-  return <main className="min-h-screen px-6 py-12 text-white"><div className="mx-auto max-w-5xl space-y-8">
-    <Link href="/" className="text-sm text-emerald-300 hover:underline">← Каталог</Link>
-    <header><p className="text-emerald-300">Профиль игрока</p><h1 className="mt-2 text-4xl font-semibold">{user.minecraftNickname}</h1><p className="mt-2 text-slate-400">Роль: {ROLE_LABELS[user.role]}</p></header>
-    {user.mustChangePassword && <div className="rounded-xl border border-amber-500/50 bg-amber-500/10 p-4 text-amber-200">Смените временный пароль перед продолжением работы.</div>}
+  return <main className="min-h-screen px-4 py-10 text-white sm:px-6 lg:px-8"><div className="mx-auto max-w-5xl space-y-8">
+    <Link href="/" className="text-sm text-rose-200 hover:text-rose-100 hover:underline">← Каталог</Link>
+    <header className="glass-panel rounded-[2rem] p-6 md:p-8"><p className="glass-eyebrow">Профиль игрока</p><h1 className="mt-3 text-4xl font-semibold md:text-5xl">{user.minecraftNickname}</h1><p className="mt-2 text-[var(--muted)]">Роль: {ROLE_LABELS[user.role]}</p></header>
+    {user.mustChangePassword && <div className="rounded-2xl border border-amber-500/50 bg-amber-500/10 p-4 text-amber-200">Смените временный пароль перед продолжением работы.</div>}
     <section aria-label="Статистика игрока" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <Stat value={createdBuildings} label="создано построек" />
       <Stat value={involvedBuildings} label="проектов с вашим вкладом" />
@@ -50,11 +50,11 @@ export default async function ProfilePage() {
       <Stat value={auditCount} label="действий в журнале" />
     </section>
 
-    <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-      <h2 className="text-xl font-semibold">Последний вклад</h2>
-      {activity.length === 0 ? <p className="text-sm text-slate-400">Пока нет операций со сбором материалов.</p> : <ul className="divide-y divide-slate-800">{activity.map((item) => <li key={item.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
-        <span>{ACTIVITY_LABELS[item.kind]} {Math.abs(item.quantityDelta).toLocaleString("ru-RU")} × {item.material.name} · <Link href={`/buildings/${item.material.building.id}`} className="text-emerald-300 hover:underline">{item.material.building.name}</Link></span>
-        <time className="text-slate-500">{item.createdAt.toLocaleString("ru-RU")}</time>
+    <section className="glass-panel space-y-4 rounded-3xl p-5">
+      <div><p className="glass-eyebrow">История</p><h2 className="mt-2 text-xl font-semibold">Последний вклад</h2></div>
+      {activity.length === 0 ? <p className="text-sm text-[var(--muted)]">Пока нет операций со сбором материалов.</p> : <ul className="divide-y divide-white/8">{activity.map((item) => <li key={item.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
+        <span>{ACTIVITY_LABELS[item.kind]} {Math.abs(item.quantityDelta).toLocaleString("ru-RU")} × {item.material.name} · <Link href={`/buildings/${item.material.building.id}`} className="text-rose-200 hover:text-rose-100 hover:underline">{item.material.building.name}</Link></span>
+        <time className="text-[var(--muted-strong)]">{item.createdAt.toLocaleString("ru-RU")}</time>
       </li>)}</ul>}
     </section>
     <ProfileActions nickname={user.minecraftNickname} />
@@ -62,5 +62,5 @@ export default async function ProfilePage() {
 }
 
 function Stat({ value, label }: { value: number | string; label: string }) {
-  return <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5"><b className="text-3xl">{value}</b><p className="mt-1 text-slate-400">{label}</p></div>;
+  return <div className="glass-panel-soft rounded-2xl p-5"><b className="text-3xl text-rose-100">{value}</b><p className="mt-1 text-[var(--muted)]">{label}</p></div>;
 }

@@ -96,24 +96,25 @@ export default function WarehouseClient({ initialStocks, canManage }: Props) {
 
   return (
     <div className="space-y-6">
-      {canManage && <form onSubmit={submit} className="grid gap-3 rounded-3xl border border-slate-800 bg-slate-900/80 p-5 md:grid-cols-[1.5fr_1fr_1fr_2fr_auto] md:items-end">
-        <label className="text-sm text-slate-300">Материал<input value={itemName} onChange={(event) => setItemName(event.target.value)} maxLength={160} required className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white" placeholder="Например, камень" /></label>
-        <label className="text-sm text-slate-300">Движение<select value={kind} onChange={(event) => setKind(event.target.value as MovementKind)} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white"><option value="RECEIVED">Приход</option><option value="USED">Списание</option><option value="ADJUSTED">Корректировка</option></select></label>
-        <label className="text-sm text-slate-300">{kind === "ADJUSTED" ? "Итоговый остаток" : "Количество"}<input type="number" min={kind === "ADJUSTED" ? 0 : 1} max={2147483647} step={1} value={quantity} onChange={(event) => setQuantity(event.target.value)} required className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white" /></label>
-        <label className="text-sm text-slate-300">Примечание<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white" placeholder="Необязательно" /></label>
-        <button type="submit" disabled={busy} className="rounded-xl bg-emerald-400 px-4 py-2 font-semibold text-slate-950 disabled:opacity-50">{busy ? "Сохраняем…" : "Сохранить"}</button>
+      {canManage && <form onSubmit={submit} className="glass-panel-soft grid gap-4 rounded-3xl p-5 md:grid-cols-[1.5fr_1fr_1fr_2fr_auto] md:items-end">
+        <div className="md:col-span-full"><p className="glass-eyebrow">Операция со складом</p><p className="mt-1 text-sm text-[var(--muted)]">Зафиксируйте приход, списание или точную корректировку остатка.</p></div>
+        <label className="text-sm text-[var(--muted)]">Материал<input value={itemName} onChange={(event) => setItemName(event.target.value)} maxLength={160} required className="glass-control mt-2 w-full rounded-xl px-3 py-2.5" placeholder="Например, камень" /></label>
+        <label className="text-sm text-[var(--muted)]">Движение<select value={kind} onChange={(event) => setKind(event.target.value as MovementKind)} className="glass-control mt-2 w-full rounded-xl px-3 py-2.5"><option value="RECEIVED">Приход</option><option value="USED">Списание</option><option value="ADJUSTED">Корректировка</option></select></label>
+        <label className="text-sm text-[var(--muted)]">{kind === "ADJUSTED" ? "Итоговый остаток" : "Количество"}<input type="number" min={kind === "ADJUSTED" ? 0 : 1} max={2147483647} step={1} value={quantity} onChange={(event) => setQuantity(event.target.value)} required className="glass-control mt-2 w-full rounded-xl px-3 py-2.5" /></label>
+        <label className="text-sm text-[var(--muted)]">Примечание<input value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} className="glass-control mt-2 w-full rounded-xl px-3 py-2.5" placeholder="Необязательно" /></label>
+        <button type="submit" disabled={busy} className="glass-action-primary rounded-xl px-4 py-2.5 disabled:opacity-50">{busy ? "Сохраняем…" : "Сохранить"}</button>
       </form>}
-      {!canManage && <p className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-400">Изменять склад могут только модераторы и администраторы.</p>}
+      {!canManage && <p className="glass-panel-soft rounded-2xl p-4 text-sm text-[var(--muted)]">Изменять склад могут только модераторы и администраторы.</p>}
       {error && <p role="alert" className="rounded-xl border border-rose-500/40 bg-rose-950/30 p-3 text-sm text-rose-200">{error}</p>}
       <section className="space-y-4" aria-labelledby="warehouse-list-heading">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="warehouse-list-heading" className="text-2xl font-semibold text-white">Остатки</h2>
-          <label className="text-sm text-slate-400">Поиск<input value={query} onChange={(event) => setQuery(event.target.value)} className="ml-2 rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white" placeholder="Название материала" /></label>
+          <div><p className="glass-eyebrow">Инвентарь</p><h2 id="warehouse-list-heading" className="mt-2 text-2xl font-semibold text-white">Остатки</h2></div>
+          <label className="text-sm text-[var(--muted)]">Поиск<input value={query} onChange={(event) => setQuery(event.target.value)} className="glass-control ml-2 rounded-xl px-3 py-2" placeholder="Название материала" /></label>
         </div>
-        {visibleStocks.length === 0 ? <p className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-slate-400">Материалы не найдены.</p> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{visibleStocks.map((stock) => <article key={stock.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-          <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-white">{stock.itemName}</h3><p className="mt-1 text-xs text-slate-500">Обновлено {formatDate(stock.updatedAt)}</p></div><strong className="text-xl text-emerald-300">{formatNumber.format(stock.quantity)}</strong></div>
-          <p className="mt-2 text-xs text-slate-400">Стака: {formatNumber.format(stock.stackSize)} · {stock.quantity === 1 ? "штука" : "штук"}</p>
-          {stock.movements.length > 0 && <ul className="mt-4 space-y-2 border-t border-slate-800 pt-3 text-xs text-slate-400">{stock.movements.slice(0, 3).map((movement) => <li key={movement.id} className="flex justify-between gap-3"><span>{KIND_LABELS[movement.kind]} · {movement.delta > 0 ? "+" : ""}{formatNumber.format(movement.delta)}{movement.note ? ` · ${movement.note}` : ""}</span><span className="shrink-0 text-slate-500">{movement.actorName}</span></li>)}</ul>}
+        {visibleStocks.length === 0 ? <p className="glass-panel-soft rounded-2xl p-6 text-[var(--muted)]">Материалы не найдены.</p> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{visibleStocks.map((stock) => <article key={stock.id} className="glass-panel rounded-3xl p-5 transition hover:-translate-y-0.5">
+          <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-white">{stock.itemName}</h3><p className="mt-1 text-xs text-[var(--muted-strong)]">Обновлено {formatDate(stock.updatedAt)}</p></div><strong className="text-xl text-rose-100">{formatNumber.format(stock.quantity)}</strong></div>
+          <p className="mt-2 text-xs text-[var(--muted)]">Стака: {formatNumber.format(stock.stackSize)} · {stock.quantity === 1 ? "штука" : "штук"}</p>
+          {stock.movements.length > 0 && <ul className="mt-4 space-y-2 border-t border-white/8 pt-3 text-xs text-[var(--muted)]">{stock.movements.slice(0, 3).map((movement) => <li key={movement.id} className="flex justify-between gap-3"><span>{KIND_LABELS[movement.kind]} · {movement.delta > 0 ? "+" : ""}{formatNumber.format(movement.delta)}{movement.note ? ` · ${movement.note}` : ""}</span><span className="shrink-0 text-[var(--muted-strong)]">{movement.actorName}</span></li>)}</ul>}
         </article>)}</div>}
       </section>
     </div>
