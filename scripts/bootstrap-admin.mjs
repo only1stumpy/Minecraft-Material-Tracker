@@ -10,7 +10,8 @@ const prisma = new PrismaClient(); const temporaryPassword = `Av1-${randomBytes(
 const salt = randomBytes(16).toString("hex"); const key = await promisify(nodeScrypt)(temporaryPassword, salt, 64);
 const passwordHash = `scrypt:${salt}:${Buffer.from(key).toString("hex")}`;
 try {
-  const user = await prisma.user.upsert({ where: { minecraftNickname: nickname }, update: { role: "ADMIN", isBlocked: false, passwordHash, mustChangePassword: true, sessionVersion: { increment: 1 } }, create: { minecraftNickname: nickname, role: "ADMIN", passwordHash } });
+  const normalizedNickname = nickname.toLowerCase();
+  const user = await prisma.user.upsert({ where: { normalizedNickname }, update: { minecraftNickname: nickname, role: "ADMIN", isBlocked: false, passwordHash, mustChangePassword: true, sessionVersion: { increment: 1 } }, create: { minecraftNickname: nickname, normalizedNickname, role: "ADMIN", passwordHash } });
   await prisma.session.deleteMany({ where: { userId: user.id } });
   console.log(`Администратор: ${nickname}\nВременный пароль: ${temporaryPassword}\nСохраните пароль сейчас.`);
 } finally { await prisma.$disconnect(); }

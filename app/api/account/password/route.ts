@@ -13,11 +13,12 @@ export async function POST(request: Request) {
   const next = typeof body?.newPassword === "string" ? body.newPassword : "";
   if (!(await verifyPassword(current, user.passwordHash))) return NextResponse.json({ error: "Текущий пароль неверен" }, { status: 400 });
   if (!validatePassword(next)) return NextResponse.json({ error: "Пароль должен содержать не менее 12 символов, буквы и цифры" }, { status: 400 });
-  await prisma.$transaction([
+  if (current === next) return NextResponse.json({ error: "Новый пароль должен отличаться от текущего" }, { status: 400 });
+  const [updatedUser] = await prisma.$transaction([
     prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(next), mustChangePassword: false, sessionVersion: { increment: 1 } } }),
     prisma.session.deleteMany({ where: { userId: user.id } }),
     prisma.auditLog.create({ data: { actorId: user.id, action: "PASSWORD_CHANGED", entityType: "User", entityId: user.id } }),
   ]);
-  await createSession(user.id, user.sessionVersion + 1);
+  await createSession(user.id, updatedUser.sessionVersion);
   return NextResponse.json({ ok: true });
 }

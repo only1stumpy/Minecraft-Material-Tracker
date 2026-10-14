@@ -24,5 +24,5 @@ export async function verifyPassword(password: string, encoded: string) {
 }
 
 export function validatePassword(password: string) {
-  return password.length >= 12 && /[a-zа-я]/i.test(password) && /\d/.test(password);
+  return password.length >= 12 && password.length <= 128 && /[a-zа-я]/i.test(password) && /\d/.test(password);
 }

@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   const passwordHash = await hashPassword(temporaryPassword);
   try {
     const user = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const created = await tx.user.create({ data: { minecraftNickname: nickname, role, passwordHash } });
+      const created = await tx.user.create({ data: { minecraftNickname: nickname, normalizedNickname: nickname.toLowerCase(), role, passwordHash } });
       await tx.auditLog.create({ data: { actorId: actor.id, action: "USER_CREATED", entityType: "User", entityId: created.id, metadata: { nickname, role } } });
       return created;
     });

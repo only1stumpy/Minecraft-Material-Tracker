@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 import BuildingChecklist from "./BuildingChecklist";
 import { prisma } from "@/lib/prisma";
@@ -6,17 +7,10 @@ import type { MaterialRow } from "@/lib/materials";
 
 export const dynamic = "force-dynamic";
 
-export default async function BuildingPage({
-  params,
-}: {
-  params: Promise<{ id: string }>; // 1. Указываем, что params — это Promise
-}) {
-  // 2. Ждем получения параметров
+export default async function BuildingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-
-  // 3. Используем уже готовую переменную id
-  const building = await prisma.buildings.findUnique({
-    where: { id: id },
+  const building = await prisma.building.findUnique({
+    where: { id, deletedAt: null },
   });
 
   if (!building) {
@@ -28,8 +22,8 @@ export default async function BuildingPage({
           </Link>
           <h1 className="text-3xl font-semibold">Постройка не найдена</h1>
           <p className="text-slate-400">
-            Такой страницы нет в базе данных. Проверьте ссылку или создайте
-            новую постройку.
+            Такой страницы нет в базе данных. Проверьте ссылку или создайте новую
+            постройку.
           </p>
         </div>
       </div>
@@ -59,19 +53,18 @@ export default async function BuildingPage({
         {building.screenshotDataUrl ? (
           <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
             <h2 className="text-lg font-semibold">Скриншот постройки</h2>
-            <img
+            <Image
               src={building.screenshotDataUrl}
               alt={`Скриншот постройки ${building.name}`}
+              width={1200}
+              height={675}
+              unoptimized
               className="mt-4 w-full rounded-2xl object-cover"
             />
           </section>
         ) : null}
 
-        <BuildingChecklist
-          materials={building.materials as MaterialRow[]}
-          initialChecklist={building.checklist as any[]}
-          buildingId={building.id}
-        />
+        <BuildingChecklist materials={building.materials as MaterialRow[]} />
       </main>
     </div>
   );

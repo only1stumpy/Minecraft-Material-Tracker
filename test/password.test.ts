@@ -13,3 +13,8 @@ test("временный пароль случаен и соответствуе
   const first = generateTemporaryPassword(); const second = generateTemporaryPassword();
   assert.notEqual(first, second); assert.equal(validatePassword(first), true);
 });
+
+test("политика отклоняет слишком короткие и чрезмерно длинные пароли", () => {
+  assert.equal(validatePassword("short1"), false);
+  assert.equal(validatePassword(`Secure1${"x".repeat(130)}`), false);
+});

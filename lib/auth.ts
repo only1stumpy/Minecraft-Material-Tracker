@@ -33,6 +33,13 @@ export async function getCurrentUser() {
   if (!session || session.expiresAt <= new Date() || session.user.isBlocked || session.version !== session.user.sessionVersion) {
     return null;
   }
+  if (session.lastSeenAt.getTime() < Date.now() - 5 * 60_000) {
+    const now = new Date();
+    await prisma.$transaction([
+      prisma.session.update({ where: { id: session.id }, data: { lastSeenAt: now } }),
+      prisma.user.update({ where: { id: session.userId }, data: { lastActiveAt: now } }),
+    ]);
+  }
   return session.user;
 }
 

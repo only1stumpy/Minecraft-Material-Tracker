@@ -1,16 +1,32 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
+import { prisma } from "@/lib/prisma";
 
-const attempts = new Map<string, { count: number; resetAt: number }>();
+const throttleKey = (identifier: string) => createHash("sha256").update(identifier).digest("hex");
 
-export function checkRateLimit(key: string, limit = 10, windowMs = 60_000) {
-  const now = Date.now();
-  const entry = attempts.get(key);
-  if (!entry || entry.resetAt <= now) {
-    attempts.set(key, { count: 1, resetAt: now + windowMs });
+export async function checkLoginRateLimit(identifier: string, limit = 8, windowMs = 15 * 60_000) {
+  const key = throttleKey(identifier);
+  const now = new Date();
+  await prisma.authThrottle.deleteMany({ where: { resetAt: { lt: new Date(now.getTime() - 24 * 60 * 60_000) } } });
+  const existing = await prisma.authThrottle.findUnique({ where: { key } });
+  if (!existing || existing.resetAt <= now) {
+    await prisma.authThrottle.upsert({
+      where: { key },
+      create: { key, attempts: 1, resetAt: new Date(now.getTime() + windowMs) },
+      update: { attempts: 1, resetAt: new Date(now.getTime() + windowMs) },
+    });
     return true;
   }
-  entry.count += 1;
-  return entry.count <= limit;
+  const updated = await prisma.authThrottle.update({
+    where: { key },
+    data: { attempts: { increment: 1 } },
+    select: { attempts: true },
+  });
+  return updated.attempts <= limit;
+}
+
+export async function clearLoginRateLimit(identifier: string) {
+  await prisma.authThrottle.deleteMany({ where: { key: throttleKey(identifier) } });
 }
 
 export function validateSameOrigin(request: Request) {
