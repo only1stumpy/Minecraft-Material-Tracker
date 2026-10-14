@@ -8,8 +8,7 @@ export async function AppHeader() {
   return <header className="site-header">
     <nav aria-label="Основная навигация" className="site-nav glass-chrome">
       <Link href="/" className="site-brand" aria-label="Antville Builder — каталог">
-        <span className="site-brand-mark" aria-hidden="true">A</span>
-        <span className="site-brand-copy"><strong>Antville</strong><span>Builder 2.0</span></span>
+        <span className="site-brand-copy"><strong>Antville Builder</strong></span>
       </Link>
       <div className="site-links" aria-label="Разделы">
         <Link href="/buildings/new" className="site-link">Новая постройка</Link>
