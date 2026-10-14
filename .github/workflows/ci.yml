@@ -47,6 +47,62 @@ jobs:
       - run: npm run db:deploy
       - name: Verify legacy building migration
         run: node scripts/verify-legacy-migration.mjs
+      - name: Verify PostgreSQL backup restore
+        run: |
+          set -euo pipefail
+          if ! command -v pg_dump >/dev/null 2>&1 || ! command -v pg_restore >/dev/null 2>&1 || ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends postgresql-client
+          fi
+
+          target_db="mmt_restore_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_${{ strategy.job-index }}"
+          native_database_url="postgresql://antville:antville@localhost:5432/antville"
+          target_url="postgresql://antville:antville@localhost:5432/${target_db}"
+          backup_dir="$RUNNER_TEMP/mmt-ci-backup"
+          dump_path=""
+
+          cleanup() {
+            psql "$native_database_url" -X -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$target_db\"" >/dev/null 2>&1 || true
+            if [[ -d "$backup_dir" ]]; then
+              find "$backup_dir" -maxdepth 1 -type f -delete 2>/dev/null || true
+              rmdir "$backup_dir" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          if ! BACKUP_DIRECTORY="$backup_dir" npm run --silent db:backup >/dev/null; then
+            echo "CI backup command failed" >&2
+            exit 1
+          fi
+          dump_path="$(find "$backup_dir" -maxdepth 1 -type f -name '*.dump' -print -quit)"
+          if [[ -z "$dump_path" || ! -r "$dump_path" ]]; then
+            echo "CI backup command did not produce a readable custom dump" >&2
+            exit 1
+          fi
+          echo "CI backup produced a readable custom dump"
+
+          guard_status=0
+          guard_output="$(
+            DATABASE_URL="$DATABASE_URL" \
+            RESTORE_DATABASE_URL="${native_database_url}?sslmode=disable" \
+            RESTORE_TARGET_ISOLATED=YES \
+            npm run db:restore -- "$dump_path" 2>&1
+          )" || guard_status=$?
+          if (( guard_status == 0 )) || [[ "$guard_output" != *"RESTORE_DATABASE_URL не может совпадать с DATABASE_URL"* ]]; then
+            echo "Restore safety guard did not reject the same database identity" >&2
+            exit 1
+          fi
+          echo "Restore safety guard verified: same database identity rejected"
+
+          psql "$native_database_url" -X -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$target_db\"" >/dev/null
+          RESTORE_DATABASE_URL="$target_url" RESTORE_TARGET_ISOLATED=YES npm run db:restore -- "$dump_path"
+
+          restored_fixture="$(psql "$target_url" -X -v ON_ERROR_STOP=1 -Atqc 'SELECT "id" || chr(124) || "name" FROM public."Building" WHERE "id" = $$legacy-building-fixture$$;')"
+          if [[ "$restored_fixture" != "legacy-building-fixture|Legacy Rathaus" ]]; then
+            echo "Восстановленная legacy-карточка не совпала с ожидаемым fixture" >&2
+            exit 1
+          fi
+          echo "PostgreSQL backup restore verified: legacy fixture survived"
       - run: npm test
       - run: npm run lint
       - run: npm run typecheck
