@@ -1,3 +1,7 @@
+# Antville Builder
+
+Техническое задание на следующий крупный релиз: [Antville Builder 2.0](docs/antville-builder-2.0.md).
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

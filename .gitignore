@@ -19,6 +19,8 @@
 
 # production
 /build
+/backups
+/prisma/*.db*
 
 # misc
 .DS_Store
