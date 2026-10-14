@@ -8,7 +8,7 @@
 
 | Раздел ТЗ | Статус | Доказательства в исходниках | Остаток и ограничение |
 | --- | --- | --- | --- |
-| 1. Авторизация и система аккаунтов | Реализовано в коде | [`lib/auth.ts`](../lib/auth.ts), [`app/api/admin/users/route.ts`](../app/api/admin/users/route.ts), [`app/profile/page.tsx`](../app/profile/page.tsx) | Production-вход `only1stumpy` проверен: временный пароль принят, приложение потребовало сменить его. Смена нового пароля и выход со всех устройств отдельно не проверялись. |
+| 1. Авторизация и система аккаунтов | Реализовано в коде | [`lib/auth.ts`](../lib/auth.ts), [`app/api/admin/users/route.ts`](../app/api/admin/users/route.ts), [`app/profile/page.tsx`](../app/profile/page.tsx) | Production-вход `only1stumpy` проверен: временный пароль заменён через штатную форму, новый вход вернул `mustChangePassword=false`. `/admin` и `/moderation` вернули HTTP 200. Сценарий отдельной кнопки «Выйти со всех устройств» не проверялся. |
 | 2. Административная панель | Реализовано в коде | [`app/admin/page.tsx`](../app/admin/page.tsx), [`app/moderation/ModerationClient.tsx`](../app/moderation/ModerationClient.tsx), [`app/api/buildings/[id]/revisions/route.ts`](../app/api/buildings/%5Bid%5D/revisions/route.ts) | Production-проверка аудита, мягкого удаления и восстановления не выполнялась. |
 | 3. Инфраструктура и размещение серверов | Внешняя проверка | [`app/api/health/route.ts`](../app/api/health/route.ts), [`scripts/backup-database.sh`](../scripts/backup-database.sh), [`docs/stage-1-operations.md`](stage-1-operations.md) | V2 работает в Vercel Production и соединяется с PostgreSQL; private Blob Store создан. Регион приложения пока не выбран по реальным замерам игроков. Восстановление из backup и тестовая загрузка файла ещё не проверялись. |
 | 4. Создание и редактирование построек | Реализовано в коде | [`app/buildings/BuildingForm.tsx`](../app/buildings/BuildingForm.tsx), [`app/api/buildings/route.ts`](../app/api/buildings/route.ts), [`lib/nbt.ts`](../lib/nbt.ts) | Production Blob Store настроен как private. Сквозная production-загрузка схемы/скриншота и сценарий восстановления версии не проверялись. |
@@ -45,8 +45,8 @@
 - `npx prisma validate` — успешно;
 - локальная Next.js production build — успешно;
 - обе новые Prisma-миграции применены Vercel Production build; повторная production-сборка сообщила `No pending migrations to apply`;
-- `https://antville.vercel.app/api/health` — HTTP 200, ответ `{"status":"ok"}` до последнего релиза; Vercel подтвердил успешный Production deployment PR #10;
-- `/login` — HTTP 200; вход `only1stumpy` проверен и требует сменить временный пароль;
+- `https://antville.vercel.app/api/health` — HTTP 200, ответ `{"status":"ok"}` после последнего production-релиза; Production deployment PR #11 завершился успешно;
+- `/login` — HTTP 200; production-вход `only1stumpy` проверен после смены пароля, флаг `mustChangePassword` снят; страницы `/admin` и `/moderation` вернули HTTP 200;
 - временный bootstrap endpoint удалён и возвращает HTTP 404 на production;
 - private Blob Store подключён к Production, но фактическая загрузка/скачивание пользовательского файла ещё не проверены;
 - Markdown validator, `git diff --check` и JSON-проверка `vercel.json` проходят.
