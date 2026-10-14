@@ -1,6 +1,23 @@
 import type { Metadata, Viewport } from "next";
+import { Onest, Prata } from "next/font/google";
 import "./globals.css";
 import { AppHeader } from "@/components/AppHeader";
+
+const onest = Onest({
+  subsets: ["cyrillic", "latin"],
+  variable: "--font-onest",
+  weight: "variable",
+  display: "swap",
+  fallback: ["Arial", "sans-serif"],
+});
+
+const prata = Prata({
+  subsets: ["cyrillic", "latin"],
+  variable: "--font-prata",
+  weight: "400",
+  display: "swap",
+  fallback: ["Georgia", "serif"],
+});
 
 export const metadata: Metadata = {
   title: { default: "Antville Builder", template: "%s — Antville Builder" },
@@ -18,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru">
-      <body className="antialiased">
+      <body className={`${onest.variable} ${prata.variable} antialiased`}>
         <AppHeader />{children}
       </body>
     </html>
