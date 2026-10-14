@@ -1,8 +1,24 @@
+# Antville Builder
+
+Техническое задание на следующий крупный релиз: [Antville Builder 2.0](docs/antville-builder-2.0.md).
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
 
-First, run the development server:
+Use Node.js 20 or 22, copy `.env.example` to `.env`, and set a PostgreSQL
+`DATABASE_URL`. Then install dependencies and apply migrations:
+
+```bash
+npm install
+npm run db:deploy
+npm run admin:bootstrap -- MinecraftNick
+```
+
+`npm install` automatically runs `prisma generate`, so imports from
+`@prisma/client` are ready before Next.js builds the application.
+
+Then run the development server:
 
 ```bash
 npm run dev
