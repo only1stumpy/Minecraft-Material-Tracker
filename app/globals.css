@@ -47,17 +47,11 @@ body {
   line-height: 1.55;
 }
 
-body::before {
-  position: fixed;
-  z-index: -1;
-  inset: -12rem;
-  pointer-events: none;
-  content: "";
-  background:
-    radial-gradient(38rem 34rem at 13% 9%, rgba(162, 53, 84, 0.2), transparent 72%),
-    radial-gradient(35rem 32rem at 92% 18%, rgba(112, 31, 58, 0.18), transparent 70%),
-    radial-gradient(45rem 42rem at 52% 103%, rgba(232, 165, 182, 0.09), transparent 72%);
-  filter: blur(18px);
+
+@media (prefers-reduced-motion: reduce) {
+  [data-aifx="noise-shimmer"] {
+    display: none;
+  }
 }
 
 h1,
