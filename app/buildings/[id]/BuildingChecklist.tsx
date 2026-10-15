@@ -9,7 +9,6 @@ import { materialProgressStatusLabel, summarizeMaterialProgress } from "@/lib/ma
 type Contribution = {
   userId: string;
   gatheredQty: number;
-  deliveredQty: number;
   user: { minecraftNickname: string };
 };
 
@@ -49,7 +48,7 @@ type Props = {
   initialFilters: BuildingChecklistFilters;
 };
 
-type Action = "reserve" | "release" | "gather" | "deliver" | "correct";
+type Action = "reserve" | "release" | "gather" | "correct";
 export type MaterialFilter = "all" | "mine" | "free" | "active" | "ready";
 export type MaterialSort = "name" | "required" | "remaining" | "gathered";
 export type BuildingChecklistFilters = {
@@ -65,15 +64,13 @@ const numberFormatter = new Intl.NumberFormat("ru-RU");
 
 function quantities(row: ChecklistMaterial) {
   const gathered = row.contributions.reduce((sum, contribution) => sum + contribution.gatheredQty, 0);
-  const delivered = row.contributions.reduce((sum, contribution) => sum + contribution.deliveredQty, 0);
   const progress = summarizeMaterialProgress({
     requiredQty: row.requiredQty,
     gatheredQty: gathered,
-    deliveredQty: delivered,
     surplusLimit: row.surplusLimit,
     reservations: row.reservations,
   });
-  return { gathered, delivered, reserved: progress.reservedQty, free: progress.freeQty, remaining: progress.remainingQty, percent: progress.gatheredPercent, status: progress.status };
+  return { gathered, reserved: progress.reservedQty, free: progress.freeQty, remaining: progress.remainingQty, percent: progress.gatheredPercent, status: progress.status };
 }
 
 function breakdownLabel(quantity: number, stackSize: number) {
@@ -148,7 +145,6 @@ export default function BuildingChecklist({
 
   const totalRequired = materials.reduce((sum, row) => sum + row.requiredQty, 0);
   const totalGathered = optimisticMaterials.reduce((sum, row) => sum + quantities(row).gathered, 0);
-  const totalDelivered = optimisticMaterials.reduce((sum, row) => sum + quantities(row).delivered, 0);
 
   function replaceFilterQuery(next: BuildingChecklistFilters) {
     const url = new URL(window.location.href);
@@ -261,13 +257,13 @@ export default function BuildingChecklist({
         <div>
           <p className="glass-eyebrow">Ресурсы</p><h2 id="materials-heading" className="mt-2 text-2xl font-semibold text-white">Материалы и вклад</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Собрано {numberFormatter.format(totalGathered)} / {numberFormatter.format(totalRequired)} · доставлено {numberFormatter.format(totalDelivered)}
+            Собрано {numberFormatter.format(totalGathered)} / {numberFormatter.format(totalRequired)}
           </p>
+          <p className="mt-1 text-xs text-slate-500">Отмечайте сбор после того, как положили ресурсы в сундук постройки.</p>
         </div>
-        <div className="grid grid-cols-3 gap-3 text-sm md:text-right">
+        <div className="grid grid-cols-2 gap-3 text-sm md:text-right">
           <span>Требуется <b className="block text-white">{numberFormatter.format(totalRequired)}</b></span>
           <span>Собрано <b className="block text-rose-200">{numberFormatter.format(totalGathered)}</b></span>
-          <span>Доставлено <b className="block text-sky-300">{numberFormatter.format(totalDelivered)}</b></span>
         </div>
       </div>
 
@@ -295,12 +291,10 @@ export default function BuildingChecklist({
             const pendingReservation = pendingReservations[row.id] && !confirmedPendingIds.has(row.id)
               ? pendingReservations[row.id]
               : null;
-            const myContribution = row.contributions.find((item) => item.userId === actorId);
             const ownReservations = row.reservations.filter((item) => item.userId === actorId && !item.releasedAt);
             const currentReservation = ownReservations.find((item) => item.quantity > item.gatheredQty);
             const historyReservations = row.reservations.filter((reservation) => !reservation.releasedAt
               && reservation.gatheredQty < reservation.quantity);
-            const unDelivered = (myContribution?.gatheredQty ?? 0) - (myContribution?.deliveredQty ?? 0);
             const value = amounts[row.id] ?? String(currentReservation
               ? currentReservation.quantity - currentReservation.gatheredQty
               : Math.max(0, Math.min(progress.free, progress.remaining)));
@@ -323,7 +317,7 @@ export default function BuildingChecklist({
                   </div>
                   <div className="min-w-0 space-y-2 text-sm md:max-w-[55%] md:text-right">
                     <p><span className="glass-pill rounded-full px-2 py-1 text-xs" aria-label={`Статус материала: ${statusLabel}`}>{statusLabel}</span></p>
-                    <p className="break-words"><b className="text-rose-200">{numberFormatter.format(progress.gathered)}</b> собрано · <b className="text-sky-300">{numberFormatter.format(progress.delivered)}</b> доставлено</p>
+                    <p className="break-words"><b className="text-rose-200">{numberFormatter.format(progress.gathered)}</b> собрано</p>
                     <p className="break-words text-slate-400">Осталось по плану: {numberFormatter.format(progress.remaining)} · свободно: {numberFormatter.format(progress.free)}{row.surplusLimit > 0 ? ` · избыток до +${numberFormatter.format(row.surplusLimit)}` : ""}</p>
                   </div>
                 </div>
@@ -332,7 +326,7 @@ export default function BuildingChecklist({
                 </div>
 
                 {historyReservations.length > 0 && <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs leading-relaxed text-slate-400">{historyReservations.map((reservation) => <li key={reservation.id} className="break-words">{reservation.user.minecraftNickname}{reservation.pending ? ` · ${pendingReservation?.phase === "saving" ? "сохраняем…" : "подтверждаем…"}` : ""}: взял {numberFormatter.format(reservation.quantity)}, собрал {numberFormatter.format(reservation.gatheredQty)} (в работе)</li>)}</ul>}
-                {row.contributions.length > 0 && <p className="mt-2 break-words text-xs leading-relaxed text-slate-400">Вклад: {row.contributions.map((contribution) => `${contribution.user.minecraftNickname} — ${numberFormatter.format(contribution.gatheredQty)} собрано / ${numberFormatter.format(contribution.deliveredQty)} доставлено`).join(" · ")}</p>}
+                {row.contributions.length > 0 && <p className="mt-2 break-words text-xs leading-relaxed text-slate-400">Вклад: {row.contributions.map((contribution) => `${contribution.user.minecraftNickname} — ${numberFormatter.format(contribution.gatheredQty)} собрано`).join(" · ")}</p>}
 
                 {canParticipate && <div className="mt-4 grid grid-cols-1 items-end gap-2 border-t border-white/10 pt-4 sm:flex sm:flex-wrap">
                   <label className="grid min-w-0 gap-1 text-xs text-slate-400 sm:w-28">Количество<input inputMode="numeric" value={value} onChange={(event) => setAmounts((items) => ({ ...items, [row.id]: event.target.value }))} className="glass-control w-full rounded-lg px-3 py-2 text-sm text-white" /></label>
@@ -341,7 +335,6 @@ export default function BuildingChecklist({
                     <button type="button" disabled={busy || !validAmount || parsedAmount > currentReservation.quantity - currentReservation.gatheredQty} onClick={() => void runAction(row, "gather", parsedAmount, currentReservation.id)} className="glass-action-primary w-full whitespace-nowrap rounded-xl px-3 py-2 text-sm disabled:opacity-40 sm:w-auto">Отметить сбор</button>
                     <button type="button" disabled={busy} onClick={() => void runAction(row, "release", 0, currentReservation.id)} className="glass-control w-full whitespace-nowrap rounded-xl px-3 py-2 text-sm text-slate-200 disabled:opacity-40 sm:w-auto">Освободить</button>
                   </>}
-                  {unDelivered > 0 && <button type="button" disabled={busy || !validAmount || parsedAmount > unDelivered} onClick={() => void runAction(row, "deliver", parsedAmount)} className="w-full whitespace-nowrap rounded-lg border border-sky-500/60 px-3 py-2 text-sm text-sky-200 disabled:opacity-40 sm:w-auto">Отметить доставку</button>}
                 </div>}
 
                 {canModerate && row.reservations.some((reservation) => reservation.gatheredQty > 0) && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3 text-xs">
