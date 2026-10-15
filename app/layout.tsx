@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Onest, Prata } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { AppHeader } from "@/components/AppHeader";
 
@@ -36,7 +37,18 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className={`${onest.variable} ${prata.variable} antialiased`}>
+        <div
+          data-aifx="noise-shimmer"
+          data-aifx-colors="#a23554,#21161d,#e8a5b6"
+          data-aifx-bg="#09070a"
+          className="absolute inset-0 -z-10 pointer-events-none"
+          aria-hidden="true"
+        />
         <AppHeader />{children}
+        <Script
+          src="https://cdn.aidesigner.ai/effects/runtime/v1.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
