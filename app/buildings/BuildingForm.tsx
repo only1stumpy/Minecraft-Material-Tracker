@@ -385,7 +385,7 @@ export default function BuildingForm({
     </section>
     <div className="grid gap-5 md:grid-cols-2">
       <label className="grid gap-2 text-sm text-slate-300">Название постройки<input required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} className="glass-control rounded-2xl px-4 py-3 text-white" /></label>
-      <label className="grid gap-2 text-sm text-slate-300">Статус<select value={status} onChange={(event) => setStatus(event.target.value)} className="glass-control rounded-2xl px-4 py-3 text-white">{STATUS_OPTIONS.filter(([value]) => initial.id || value === "DRAFT" || value === "PLANNED").map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <label className="grid gap-2 text-sm text-slate-300">Статус<select value={status} onChange={(event) => setStatus(event.target.value)} className="glass-control rounded-2xl px-4 py-3 text-white">{STATUS_OPTIONS.filter(([value]) => initial.id || value === "DRAFT" || value === "PLANNED" || value === "COLLECTING").map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     </div>
     <label className="grid gap-2 text-sm text-slate-300">Описание<textarea maxLength={10_000} value={description} onChange={(event) => setDescription(event.target.value)} rows={4} className="glass-control rounded-2xl px-4 py-3 text-white" placeholder="Коротко о постройке и её назначении" /></label>
     <section className="space-y-4 border-t border-white/10 pt-7">
