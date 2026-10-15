@@ -51,7 +51,7 @@ export async function POST(
     return errorResponse("Количество должно быть положительным целым числом", 400);
   }
   const quantity = isPositiveSafeInteger(body.quantity) ? body.quantity : 0;
-  if (["reserve", "release", "gather", "correct"].includes(action) && typeof body.reservationId !== "string") {
+  if (["release", "gather", "correct"].includes(action) && typeof body.reservationId !== "string") {
     return errorResponse("Для этой операции нужна резервация", 400);
   }
   if (quantity > 2_147_483_647) return errorResponse("Количество превышает предел хранения", 400);
