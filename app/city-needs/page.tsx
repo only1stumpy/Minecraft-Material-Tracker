@@ -16,7 +16,6 @@ type Aggregate = {
   normalizedName: string;
   required: number;
   gathered: number;
-  delivered: number;
   covered: number;
   projects: Map<string, CityNeedView["projects"][number]>;
 };
@@ -47,7 +46,7 @@ export default async function CityNeedsPage() {
         normalizedName: true,
         requiredQty: true,
         building: { select: { id: true, name: true, status: true } },
-        contributions: { select: { gatheredQty: true, deliveredQty: true } },
+        contributions: { select: { gatheredQty: true } },
         reservations: {
           where: { userId: actor.id, releasedAt: null },
           orderBy: { createdAt: "desc" },
@@ -71,17 +70,14 @@ export default async function CityNeedsPage() {
       normalizedName,
       required: 0,
       gathered: 0,
-      delivered: 0,
       covered: 0,
       projects: new Map(),
     };
     const gathered = material.contributions.reduce((sum, contribution) => addQuantity(sum, contribution.gatheredQty), 0);
-    const delivered = material.contributions.reduce((sum, contribution) => addQuantity(sum, contribution.deliveredQty), 0);
-    const projectRemaining = Math.max(0, material.requiredQty - Math.max(gathered, delivered));
+    const projectRemaining = Math.max(0, material.requiredQty - gathered);
     current.required = addQuantity(current.required, Math.max(0, material.requiredQty));
     current.gathered = addQuantity(current.gathered, gathered);
-    current.delivered = addQuantity(current.delivered, delivered);
-    current.covered = addQuantity(current.covered, Math.max(gathered, delivered));
+    current.covered = addQuantity(current.covered, gathered);
     current.projects.set(material.id, {
       materialId: material.id,
       buildingId: material.building.id,
@@ -90,7 +86,6 @@ export default async function CityNeedsPage() {
       statusLabel: statusLabels[material.building.status as (typeof ACTIVE_STATUSES)[number]] ?? material.building.status,
       required: material.requiredQty,
       gathered,
-      delivered,
       remaining: projectRemaining,
       reservations: material.reservations.filter((reservation) => reservation.quantity > reservation.gatheredQty).map((reservation) => ({
         id: reservation.id,
@@ -110,7 +105,6 @@ export default async function CityNeedsPage() {
       normalizedName: row.normalizedName,
       required: Math.min(MAX_INT, row.required),
       gathered: Math.min(MAX_INT, row.gathered),
-      delivered: Math.min(MAX_INT, row.delivered),
       covered: Math.min(MAX_INT, covered),
       projectRemaining: Math.min(MAX_INT, projectRemaining),
       warehouseQuantity: Math.min(MAX_INT, warehouseQuantity),
@@ -127,7 +121,7 @@ export default async function CityNeedsPage() {
             <Link href="/" className="text-sm text-rose-200 hover:text-rose-100 hover:underline">← В каталог</Link>
             <p className="glass-eyebrow mt-6">Сводка ресурсов</p>
             <h1 className="mt-2 text-4xl font-semibold text-white md:text-5xl">Потребности города</h1>
-            <p className="mt-2 max-w-3xl text-[var(--muted)]">Остаток рассчитывается по активным постройкам. Собранное и доставленное покрытие не складываются повторно, затем вычитается общий склад.</p>
+            <p className="mt-2 max-w-3xl text-[var(--muted)]">Остаток рассчитывается по активным постройкам: собранное покрывает потребность, затем вычитается общий склад.</p>
           </div>
           <Link href="/warehouse" className="glass-control rounded-xl px-4 py-2 text-sm text-rose-100 hover:border-rose-300/70">← Общий склад</Link>
         </header>
