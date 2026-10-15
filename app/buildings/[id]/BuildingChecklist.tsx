@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { breakdownMaterial } from "@/lib/materials";
@@ -20,6 +20,13 @@ type Reservation = {
   gatheredQty: number;
   releasedAt: Date | null;
   user: { minecraftNickname: string };
+  pending?: boolean;
+};
+
+type PendingReservation = {
+  reservation: Reservation;
+  previousReservationIds: string[];
+  phase: "saving" | "refreshing";
 };
 
 type ChecklistMaterial = {
@@ -98,12 +105,50 @@ export default function BuildingChecklist({
   const [hideCompleted, setHideCompleted] = useState(initialFilters.materialHideCompleted);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pendingReservations, setPendingReservations] = useState<Record<string, PendingReservation>>({});
   const [error, setError] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
 
+  const confirmedPendingIds = useMemo(() => {
+    const confirmed = new Set<string>();
+    for (const row of materials) {
+      const pending = pendingReservations[row.id];
+      if (!pending) continue;
+      const previousIds = new Set(pending.previousReservationIds);
+      if (row.reservations.some((reservation) => reservation.userId === actorId
+        && !reservation.releasedAt
+        && reservation.quantity === pending.reservation.quantity
+        && !previousIds.has(reservation.id))) {
+        confirmed.add(row.id);
+      }
+    }
+    return confirmed;
+  }, [materials, pendingReservations, actorId]);
+
+  const optimisticMaterials = useMemo(() => materials.map((row) => {
+    const pending = pendingReservations[row.id];
+    if (!pending || confirmedPendingIds.has(row.id)) return row;
+    return { ...row, reservations: [...row.reservations, pending.reservation] };
+  }), [materials, pendingReservations, confirmedPendingIds]);
+
+  useEffect(() => {
+    if (confirmedPendingIds.size === 0) return;
+    setPendingReservations((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const id of confirmedPendingIds) {
+        if (next[id]) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [confirmedPendingIds]);
+
   const totalRequired = materials.reduce((sum, row) => sum + row.requiredQty, 0);
-  const totalGathered = materials.reduce((sum, row) => sum + quantities(row).gathered, 0);
-  const totalDelivered = materials.reduce((sum, row) => sum + quantities(row).delivered, 0);
+  const totalGathered = optimisticMaterials.reduce((sum, row) => sum + quantities(row).gathered, 0);
+  const totalDelivered = optimisticMaterials.reduce((sum, row) => sum + quantities(row).delivered, 0);
 
   function replaceFilterQuery(next: BuildingChecklistFilters) {
     const url = new URL(window.location.href);
@@ -135,7 +180,7 @@ export default function BuildingChecklist({
     replaceFilterQuery({ materialFilter: filter, materialQ: search, materialSort: sort, materialHideCompleted: next });
   }
 
-  const visibleMaterials = useMemo(() => materials
+  const visibleMaterials = useMemo(() => optimisticMaterials
     .filter((row) => {
       const progress = quantities(row);
       if (hideCompleted && progress.gathered >= row.requiredQty) return false;
@@ -152,12 +197,28 @@ export default function BuildingChecklist({
       if (sort === "remaining") return quantities(right).remaining - quantities(left).remaining || left.name.localeCompare(right.name, "ru");
       if (sort === "gathered") return quantities(right).gathered - quantities(left).gathered || left.name.localeCompare(right.name, "ru");
       return left.name.localeCompare(right.name, "ru");
-    }), [materials, actorId, filter, hideCompleted, search, sort]);
+    }), [optimisticMaterials, actorId, filter, hideCompleted, search, sort]);
 
   async function runAction(row: ChecklistMaterial, action: Action, quantity: number, reservationId?: string, targetUserId?: string, direction?: "add" | "remove") {
     setError("");
     setSaveMessage("");
     setBusyId(row.id);
+    const pendingReservation = action === "reserve" ? {
+      reservation: {
+        id: `optimistic:${crypto.randomUUID()}`,
+        userId: actorId,
+        quantity,
+        gatheredQty: 0,
+        releasedAt: null,
+        user: { minecraftNickname: "Вы" },
+        pending: true,
+      },
+      previousReservationIds: row.reservations.map((reservation) => reservation.id),
+      phase: "saving" as const,
+    } : null;
+    if (pendingReservation) {
+      setPendingReservations((current) => ({ ...current, [row.id]: pendingReservation }));
+    }
     try {
       const response = await fetch(`/api/buildings/${encodeURIComponent(buildingId)}/materials/${encodeURIComponent(row.id)}`, {
         method: "POST",
@@ -172,9 +233,22 @@ export default function BuildingChecklist({
         }),
       });
       if (!response.ok) throw new Error(await responseError(response));
+      if (pendingReservation) {
+        setPendingReservations((current) => current[row.id]
+          ? { ...current, [row.id]: { ...current[row.id], phase: "refreshing" } }
+          : current);
+      }
       setSaveMessage("Изменение сохранено");
       router.refresh();
     } catch (requestError) {
+      if (pendingReservation) {
+        setPendingReservations((current) => {
+          if (!current[row.id]) return current;
+          const next = { ...current };
+          delete next[row.id];
+          return next;
+        });
+      }
       setError(requestError instanceof Error ? requestError.message : "Ошибка сохранения");
     } finally {
       setBusyId(null);
@@ -218,6 +292,9 @@ export default function BuildingChecklist({
         <div className="space-y-3">
           {visibleMaterials.map((row) => {
             const progress = quantities(row);
+            const pendingReservation = pendingReservations[row.id] && !confirmedPendingIds.has(row.id)
+              ? pendingReservations[row.id]
+              : null;
             const myContribution = row.contributions.find((item) => item.userId === actorId);
             const ownReservations = row.reservations.filter((item) => item.userId === actorId && !item.releasedAt);
             const currentReservation = ownReservations.find((item) => item.quantity > item.gatheredQty);
@@ -225,9 +302,11 @@ export default function BuildingChecklist({
             const value = amounts[row.id] ?? String(currentReservation ? currentReservation.quantity - currentReservation.gatheredQty : Math.max(0, Math.min(progress.free, 64)));
             const parsedAmount = Number(value);
             const validAmount = Number.isSafeInteger(parsedAmount) && parsedAmount > 0;
-            const busy = busyId === row.id;
+            const busy = busyId === row.id || pendingReservation !== null;
             const itemBreakdown = breakdownMaterial(row.requiredQty, row.stackSize);
-            const statusLabel = materialProgressStatusLabel(progress.status);
+            const statusLabel = pendingReservation
+              ? `${materialProgressStatusLabel(progress.status)} · ${pendingReservation.phase === "saving" ? "сохраняем…" : "подтверждаем…"}`
+              : materialProgressStatusLabel(progress.status);
 
             return (
               <article key={row.id} className="glass-panel-soft rounded-2xl p-4 md:p-5">
@@ -248,7 +327,7 @@ export default function BuildingChecklist({
                   <div className="h-full rounded-full bg-rose-300 transition-[width]" style={{ width: `${progress.percent}%` }} />
                 </div>
 
-                {row.reservations.length > 0 && <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">{row.reservations.map((reservation) => <li key={reservation.id}>{reservation.user.minecraftNickname}: взял {numberFormatter.format(reservation.quantity)}, собрал {numberFormatter.format(reservation.gatheredQty)}{reservation.releasedAt ? " (освободил)" : " (в работе)"}</li>)}</ul>}
+                {row.reservations.length > 0 && <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">{row.reservations.map((reservation) => <li key={reservation.id}>{reservation.user.minecraftNickname}{reservation.pending ? ` · ${pendingReservation?.phase === "saving" ? "сохраняем…" : "подтверждаем…"}` : ""}: взял {numberFormatter.format(reservation.quantity)}, собрал {numberFormatter.format(reservation.gatheredQty)}{reservation.releasedAt ? " (освободил)" : " (в работе)"}</li>)}</ul>}
                 {row.contributions.length > 0 && <p className="mt-2 text-xs text-slate-400">Вклад: {row.contributions.map((contribution) => `${contribution.user.minecraftNickname} — ${numberFormatter.format(contribution.gatheredQty)} собрано / ${numberFormatter.format(contribution.deliveredQty)} доставлено`).join(" · ")}</p>}
 
                 {canParticipate && <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-white/10 pt-4">
