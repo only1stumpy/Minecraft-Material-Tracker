@@ -80,8 +80,8 @@ function parseBuildingFields(body: BuildingBody, isCreate: boolean) {
   const y = parseOptionalCoordinate(body.y, "Y");
   const z = parseOptionalCoordinate(body.z, "Z");
   if (body.status !== undefined && !isBuildingStatus(body.status)) throw new InputError("Некорректный статус постройки");
-  if (isCreate && body.status !== undefined && body.status !== "DRAFT" && body.status !== "PLANNED") {
-    throw new InputError("Новая постройка может быть черновиком или запланированной");
+  if (isCreate && body.status !== undefined && body.status !== "DRAFT" && body.status !== "PLANNED" && body.status !== "COLLECTING") {
+    throw new InputError("Новая постройка может быть черновиком, запланированной или со сбором ресурсов");
   }
   const materials = body.materials === undefined && !isCreate
     ? undefined
@@ -140,7 +140,7 @@ export async function POST(request: Request) {
           x: fields.x ?? null,
           y: fields.y ?? null,
           z: fields.z ?? null,
-          status: fields.status ?? "DRAFT",
+          status: fields.status ?? "COLLECTING",
           ownerId: actor.id,
           responsibleId,
           schematicPath: schematic?.pathname ?? null,
