@@ -36,46 +36,37 @@ html {
 }
 
 body {
-  position: relative;
-  isolation: isolate;
   min-height: 100vh;
   overflow-x: hidden;
-  background: linear-gradient(145deg, #09070a 0%, #100a10 48%, #09070d 100%);
+  background-color: #09070a;
+  background-image:
+    radial-gradient(ellipse 78rem 52rem at 10% 8%, rgba(162, 53, 84, 0.4), rgba(91, 29, 50, 0.18) 45%, transparent 73%),
+    radial-gradient(ellipse 66rem 48rem at 92% 30%, rgba(126, 35, 65, 0.34), rgba(66, 20, 39, 0.16) 50%, transparent 74%),
+    radial-gradient(ellipse 76rem 50rem at 52% 100%, rgba(91, 32, 56, 0.36), rgba(48, 17, 32, 0.15) 48%, transparent 74%),
+    linear-gradient(145deg, #09070a 0%, #100a10 48%, #09070d 100%);
+  background-position: 0% 0%, 100% 35%, 48% 100%, center;
+  background-repeat: no-repeat;
+  background-size: 145% 145%, 145% 145%, 145% 145%, cover;
+  background-attachment: fixed, fixed, fixed, fixed;
+  animation: ambient-drift 36s ease-in-out infinite alternate;
   color: var(--foreground);
   font-family: var(--font-onest), Arial, sans-serif;
   font-optical-sizing: auto;
   line-height: 1.55;
 }
 
-body::before {
-  position: fixed;
-  z-index: -1;
-  inset: -10%;
-  background:
-    radial-gradient(60rem 38rem at 12% 8%, rgba(162, 53, 84, 0.18), transparent 70%),
-    radial-gradient(52rem 36rem at 92% 34%, rgba(105, 35, 62, 0.15), transparent 72%),
-    radial-gradient(50rem 32rem at 52% 100%, rgba(69, 29, 47, 0.17), transparent 74%);
-  background-position: 0% 0%, 100% 30%, 50% 100%;
-  background-repeat: no-repeat;
-  background-size: 125% 125%;
-  filter: blur(28px);
-  animation: ambient-drift 36s ease-in-out infinite alternate;
-  content: "";
-  pointer-events: none;
-}
-
 @keyframes ambient-drift {
   from {
-    background-position: 0% 0%, 100% 30%, 50% 100%;
+    background-position: 0% 0%, 100% 35%, 48% 100%, center;
   }
 
   to {
-    background-position: 28% 18%, 58% 76%, 90% 22%;
+    background-position: 22% 16%, 62% 70%, 84% 24%, center;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  body::before {
+  body {
     animation: none;
   }
 }
