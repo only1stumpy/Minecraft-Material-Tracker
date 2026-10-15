@@ -4,8 +4,8 @@ import { materialProgressStatusLabel, summarizeMaterialProgress } from "../lib/m
 
 test("статусы материалов имеют понятные русские подписи", () => {
   assert.deepEqual(
-    ["NOT_STARTED", "IN_PROGRESS", "PARTIAL", "GATHERED", "DELIVERED"].map((status) => materialProgressStatusLabel(status as Parameters<typeof materialProgressStatusLabel>[0])),
-    ["Не начато", "В работе", "Собрано частично", "Собрано полностью", "Доставлено"],
+    ["NOT_STARTED", "IN_PROGRESS", "PARTIAL", "GATHERED"].map((status) => materialProgressStatusLabel(status as Parameters<typeof materialProgressStatusLabel>[0])),
+    ["Не начато", "В работе", "Собрано частично", "Собрано полностью"],
   );
 });
 
@@ -13,7 +13,6 @@ test("резервации уменьшают доступный остаток 
   const result = summarizeMaterialProgress({
     requiredQty: 100,
     gatheredQty: 25,
-    deliveredQty: 10,
     surplusLimit: 0,
     reservations: [
       { quantity: 40, gatheredQty: 15, releasedAt: null },
@@ -34,7 +33,6 @@ test("освобождённая резервация больше не зани
   const result = summarizeMaterialProgress({
     requiredQty: 64,
     gatheredQty: 16,
-    deliveredQty: 0,
     surplusLimit: 0,
     reservations: [{ quantity: 32, gatheredQty: 8, releasedAt: new Date() }],
   });
@@ -46,28 +44,25 @@ test("контролируемый избыток ограничивает св�
   const result = summarizeMaterialProgress({
     requiredQty: 16,
     gatheredQty: 20,
-    deliveredQty: 16,
     surplusLimit: 5,
     reservations: [],
   });
   assert.equal(result.remainingQty, 0);
   assert.equal(result.freeQty, 1);
   assert.equal(result.gatheredPercent, 100);
-  assert.equal(result.status, "DELIVERED");
+  assert.equal(result.status, "GATHERED");
 });
 
 test("повреждённые счётчики не проходят тихо", () => {
   assert.throws(() => summarizeMaterialProgress({
     requiredQty: -1,
     gatheredQty: 0,
-    deliveredQty: 0,
     surplusLimit: 0,
     reservations: [],
   }), RangeError);
   assert.throws(() => summarizeMaterialProgress({
     requiredQty: 10,
-    gatheredQty: 1,
-    deliveredQty: 2,
+    gatheredQty: -1,
     surplusLimit: 0,
     reservations: [],
   }), RangeError);
@@ -77,7 +72,6 @@ test("сумма резервов вне безопасного диапазон
   assert.throws(() => summarizeMaterialProgress({
     requiredQty: 0,
     gatheredQty: 0,
-    deliveredQty: 0,
     surplusLimit: 0,
     reservations: [
       { quantity: Number.MAX_SAFE_INTEGER, gatheredQty: 0, releasedAt: null },
@@ -90,7 +84,6 @@ test("нулевой лимит не разрешает превышение т�
   const result = summarizeMaterialProgress({
     requiredQty: 10,
     gatheredQty: 10,
-    deliveredQty: 0,
     surplusLimit: 0,
     reservations: [],
   });
@@ -98,9 +91,9 @@ test("нулевой лимит не разрешает превышение т�
 });
 
 test("отрицательный, дробный и слишком большой лимиты отклоняются", () => {
-  const input = { requiredQty: 10, gatheredQty: 0, deliveredQty: 0, reservations: [] } as const;
+  const input = { requiredQty: 10, gatheredQty: 0, reservations: [] } as const;
   assert.throws(() => summarizeMaterialProgress({ ...input, surplusLimit: -1 }), RangeError);
   assert.throws(() => summarizeMaterialProgress({ ...input, surplusLimit: 1.5 }), RangeError);
   assert.throws(() => summarizeMaterialProgress({ ...input, surplusLimit: Number.MAX_SAFE_INTEGER }), RangeError);
-  assert.throws(() => summarizeMaterialProgress({ requiredQty: 2_147_483_647, gatheredQty: 0, deliveredQty: 0, surplusLimit: 1, reservations: [] }), RangeError);
+  assert.throws(() => summarizeMaterialProgress({ requiredQty: 2_147_483_647, gatheredQty: 0, surplusLimit: 1, reservations: [] }), RangeError);
 });
