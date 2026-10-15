@@ -48,7 +48,7 @@ body {
   background-repeat: no-repeat;
   background-size: 145% 145%, 145% 145%, 145% 145%, cover;
   background-attachment: fixed, fixed, fixed, fixed;
-  animation: ambient-drift 36s ease-in-out infinite alternate;
+  animation: ambient-drift 22s ease-in-out infinite alternate;
   color: var(--foreground);
   font-family: var(--font-onest), Arial, sans-serif;
   font-optical-sizing: auto;
