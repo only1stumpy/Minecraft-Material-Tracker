@@ -9,7 +9,6 @@ export type ReservationSlice = Readonly<{
 export type MaterialProgressInput = Readonly<{
   requiredQty: number;
   gatheredQty: number;
-  deliveredQty: number;
   surplusLimit: number;
   reservations: readonly ReservationSlice[];
 }>;
@@ -19,7 +18,7 @@ export type MaterialProgress = Readonly<{
   reservedQty: number;
   freeQty: number;
   gatheredPercent: number;
-  status: "NOT_STARTED" | "IN_PROGRESS" | "PARTIAL" | "GATHERED" | "DELIVERED";
+  status: "NOT_STARTED" | "IN_PROGRESS" | "PARTIAL" | "GATHERED";
 }>;
 
 export const MATERIAL_PROGRESS_STATUS_LABELS: Record<MaterialProgress["status"], string> = {
@@ -27,7 +26,6 @@ export const MATERIAL_PROGRESS_STATUS_LABELS: Record<MaterialProgress["status"],
   IN_PROGRESS: "В работе",
   PARTIAL: "Собрано частично",
   GATHERED: "Собрано полностью",
-  DELIVERED: "Доставлено",
 };
 
 export function materialProgressStatusLabel(status: MaterialProgress["status"]) {
@@ -35,8 +33,8 @@ export function materialProgressStatusLabel(status: MaterialProgress["status"]) 
 }
 
 export function summarizeMaterialProgress(input: MaterialProgressInput): MaterialProgress {
-  const { requiredQty, gatheredQty, deliveredQty, surplusLimit, reservations } = input;
-  for (const [name, value] of Object.entries({ requiredQty, gatheredQty, deliveredQty, surplusLimit })) {
+  const { requiredQty, gatheredQty, surplusLimit, reservations } = input;
+  for (const [name, value] of Object.entries({ requiredQty, gatheredQty, surplusLimit })) {
     if (!Number.isSafeInteger(value) || value < 0) {
       throw new RangeError(`${name} must be a non-negative safe integer`);
     }
@@ -45,8 +43,6 @@ export function summarizeMaterialProgress(input: MaterialProgressInput): Materia
     || surplusLimit > MAX_MATERIAL_QUANTITY - requiredQty) {
     throw new RangeError("requiredQty plus surplusLimit exceeds the storage limit");
   }
-  if (deliveredQty > gatheredQty) throw new RangeError("deliveredQty cannot exceed gatheredQty");
-
   const reservedQty = reservations.reduce((sum, reservation) => {
     if (
       !Number.isSafeInteger(reservation.quantity) ||
@@ -67,8 +63,7 @@ export function summarizeMaterialProgress(input: MaterialProgressInput): Materia
   const gatheredPercent = integerPercentComplete(gatheredQty, requiredQty);
 
   let status: MaterialProgress["status"];
-  if (requiredQty > 0 && deliveredQty >= requiredQty) status = "DELIVERED";
-  else if (requiredQty === 0 || gatheredQty >= requiredQty) status = deliveredQty > 0 ? "DELIVERED" : "GATHERED";
+  if (requiredQty === 0 || gatheredQty >= requiredQty) status = "GATHERED";
   else if (gatheredQty > 0) status = "PARTIAL";
   else if (reservedQty > 0) status = "IN_PROGRESS";
   else status = "NOT_STARTED";
