@@ -205,7 +205,7 @@ function BuildingCard({ building }: { building: BuildingCatalogBuilding }) {
             <Link href={`/buildings/${encodeURIComponent(building.id)}`} className="break-words text-xl font-semibold text-white underline-offset-4 hover:text-rose-200 hover:underline">
               {building.name}
             </Link>
-            <p className="mt-1 text-xs text-slate-500">Создано: {formatDate(building.createdAt)} · обновлено: {formatDate(building.updatedAt)}</p>
+            <p className="mt-1 text-xs text-slate-500">Создано: {formatDate(building.createdAt)}</p>
           </div>
           <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${statusClasses[building.status] ?? "border-slate-600 bg-slate-800 text-slate-300"}`}>
             {STATUS_LABELS[building.status] ?? building.status}
