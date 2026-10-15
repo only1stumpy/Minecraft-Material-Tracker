@@ -298,8 +298,12 @@ export default function BuildingChecklist({
             const myContribution = row.contributions.find((item) => item.userId === actorId);
             const ownReservations = row.reservations.filter((item) => item.userId === actorId && !item.releasedAt);
             const currentReservation = ownReservations.find((item) => item.quantity > item.gatheredQty);
+            const historyReservations = row.reservations.filter((reservation) => !reservation.releasedAt
+              && reservation.gatheredQty < reservation.quantity);
             const unDelivered = (myContribution?.gatheredQty ?? 0) - (myContribution?.deliveredQty ?? 0);
-            const value = amounts[row.id] ?? String(currentReservation ? currentReservation.quantity - currentReservation.gatheredQty : Math.max(0, Math.min(progress.free, 64)));
+            const value = amounts[row.id] ?? String(currentReservation
+              ? currentReservation.quantity - currentReservation.gatheredQty
+              : Math.max(0, Math.min(progress.free, progress.remaining)));
             const parsedAmount = Number(value);
             const validAmount = Number.isSafeInteger(parsedAmount) && parsedAmount > 0;
             const busy = busyId === row.id || pendingReservation !== null;
@@ -310,34 +314,34 @@ export default function BuildingChecklist({
 
             return (
               <article key={row.id} className="glass-panel-soft rounded-2xl p-4 md:p-5">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-white">{row.name}</h3>
-                    <p className="mt-1 text-xs text-slate-400">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0 md:flex-1">
+                    <h3 className="break-words font-semibold text-white">{row.name}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-400">
                       Требуется {numberFormatter.format(row.requiredQty)} ({breakdownLabel(row.requiredQty, row.stackSize)}; {itemBreakdown.occupiedSlots} слотов) · стек {row.stackSize}
                     </p>
                   </div>
-                  <div className="text-right text-sm">
+                  <div className="min-w-0 space-y-2 text-sm md:max-w-[55%] md:text-right">
                     <p><span className="glass-pill rounded-full px-2 py-1 text-xs" aria-label={`Статус материала: ${statusLabel}`}>{statusLabel}</span></p>
-                    <p><b className="text-rose-200">{numberFormatter.format(progress.gathered)}</b> собрано · <b className="text-sky-300">{numberFormatter.format(progress.delivered)}</b> доставлено</p>
-                    <p className="mt-1 text-slate-400">Осталось по плану: {numberFormatter.format(progress.remaining)} · свободно: {numberFormatter.format(progress.free)}{row.surplusLimit > 0 ? ` · избыток до +${numberFormatter.format(row.surplusLimit)}` : ""}</p>
+                    <p className="break-words"><b className="text-rose-200">{numberFormatter.format(progress.gathered)}</b> собрано · <b className="text-sky-300">{numberFormatter.format(progress.delivered)}</b> доставлено</p>
+                    <p className="break-words text-slate-400">Осталось по плану: {numberFormatter.format(progress.remaining)} · свободно: {numberFormatter.format(progress.free)}{row.surplusLimit > 0 ? ` · избыток до +${numberFormatter.format(row.surplusLimit)}` : ""}</p>
                   </div>
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-label={`Сбор материала ${row.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}>
                   <div className="h-full rounded-full bg-rose-300 transition-[width]" style={{ width: `${progress.percent}%` }} />
                 </div>
 
-                {row.reservations.length > 0 && <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">{row.reservations.map((reservation) => <li key={reservation.id}>{reservation.user.minecraftNickname}{reservation.pending ? ` · ${pendingReservation?.phase === "saving" ? "сохраняем…" : "подтверждаем…"}` : ""}: взял {numberFormatter.format(reservation.quantity)}, собрал {numberFormatter.format(reservation.gatheredQty)}{reservation.releasedAt ? " (освободил)" : " (в работе)"}</li>)}</ul>}
-                {row.contributions.length > 0 && <p className="mt-2 text-xs text-slate-400">Вклад: {row.contributions.map((contribution) => `${contribution.user.minecraftNickname} — ${numberFormatter.format(contribution.gatheredQty)} собрано / ${numberFormatter.format(contribution.deliveredQty)} доставлено`).join(" · ")}</p>}
+                {historyReservations.length > 0 && <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs leading-relaxed text-slate-400">{historyReservations.map((reservation) => <li key={reservation.id} className="break-words">{reservation.user.minecraftNickname}{reservation.pending ? ` · ${pendingReservation?.phase === "saving" ? "сохраняем…" : "подтверждаем…"}` : ""}: взял {numberFormatter.format(reservation.quantity)}, собрал {numberFormatter.format(reservation.gatheredQty)} (в работе)</li>)}</ul>}
+                {row.contributions.length > 0 && <p className="mt-2 break-words text-xs leading-relaxed text-slate-400">Вклад: {row.contributions.map((contribution) => `${contribution.user.minecraftNickname} — ${numberFormatter.format(contribution.gatheredQty)} собрано / ${numberFormatter.format(contribution.deliveredQty)} доставлено`).join(" · ")}</p>}
 
-                {canParticipate && <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-white/10 pt-4">
-                  <label className="grid gap-1 text-xs text-slate-400">Количество<input inputMode="numeric" value={value} onChange={(event) => setAmounts((items) => ({ ...items, [row.id]: event.target.value }))} className="glass-control w-28 rounded-lg px-3 py-2 text-sm text-white" /></label>
-                  {!currentReservation && <button type="button" disabled={busy || !validAmount || parsedAmount > progress.free} onClick={() => void runAction(row, "reserve", parsedAmount)} className="glass-action-primary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Взять в работу</button>}
+                {canParticipate && <div className="mt-4 grid grid-cols-1 items-end gap-2 border-t border-white/10 pt-4 sm:flex sm:flex-wrap">
+                  <label className="grid min-w-0 gap-1 text-xs text-slate-400 sm:w-28">Количество<input inputMode="numeric" value={value} onChange={(event) => setAmounts((items) => ({ ...items, [row.id]: event.target.value }))} className="glass-control w-full rounded-lg px-3 py-2 text-sm text-white" /></label>
+                  {!currentReservation && <button type="button" disabled={busy || !validAmount || parsedAmount > progress.free} onClick={() => void runAction(row, "reserve", parsedAmount)} className="glass-action-primary w-full whitespace-nowrap rounded-xl px-3 py-2 text-sm disabled:opacity-40 sm:w-auto">Взять в работу</button>}
                   {currentReservation && <>
-                    <button type="button" disabled={busy || !validAmount || parsedAmount > currentReservation.quantity - currentReservation.gatheredQty} onClick={() => void runAction(row, "gather", parsedAmount, currentReservation.id)} className="glass-action-primary rounded-xl px-3 py-2 text-sm disabled:opacity-40">Отметить сбор</button>
-                    <button type="button" disabled={busy} onClick={() => void runAction(row, "release", 0, currentReservation.id)} className="glass-control rounded-xl px-3 py-2 text-sm text-slate-200 disabled:opacity-40">Освободить</button>
+                    <button type="button" disabled={busy || !validAmount || parsedAmount > currentReservation.quantity - currentReservation.gatheredQty} onClick={() => void runAction(row, "gather", parsedAmount, currentReservation.id)} className="glass-action-primary w-full whitespace-nowrap rounded-xl px-3 py-2 text-sm disabled:opacity-40 sm:w-auto">Отметить сбор</button>
+                    <button type="button" disabled={busy} onClick={() => void runAction(row, "release", 0, currentReservation.id)} className="glass-control w-full whitespace-nowrap rounded-xl px-3 py-2 text-sm text-slate-200 disabled:opacity-40 sm:w-auto">Освободить</button>
                   </>}
-                  {unDelivered > 0 && <button type="button" disabled={busy || !validAmount || parsedAmount > unDelivered} onClick={() => void runAction(row, "deliver", parsedAmount)} className="rounded-lg border border-sky-500/60 px-3 py-2 text-sm text-sky-200 disabled:opacity-40">Отметить доставку</button>}
+                  {unDelivered > 0 && <button type="button" disabled={busy || !validAmount || parsedAmount > unDelivered} onClick={() => void runAction(row, "deliver", parsedAmount)} className="w-full whitespace-nowrap rounded-lg border border-sky-500/60 px-3 py-2 text-sm text-sky-200 disabled:opacity-40 sm:w-auto">Отметить доставку</button>}
                 </div>}
 
                 {canModerate && row.reservations.some((reservation) => reservation.gatheredQty > 0) && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3 text-xs">
