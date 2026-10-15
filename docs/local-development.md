@@ -4,7 +4,7 @@
 
 Рабочий сервис закрытый и с локальной копией не соединён. В локальной базе будут только ваши тестовые аккаунты и постройки. Старые данные в неё не переносятся.
 
-Перед запуском посмотрите [полный список функций MMT](../README.md#what-the-site-can-do) и [статус реализации](v2-implementation-status.md).
+Перед запуском посмотрите [полный список возможностей MMT](../README.md#возможности-сайта) и [статус реализации](v2-implementation-status.md).
 
 ## Что понадобится
 
@@ -39,7 +39,7 @@ cd Minecraft-Material-Tracker
 Скопируйте эту команду в терминал:
 
 ```sh
-docker run --name mmt-local-db --detach --publish 127.0.0.1:5432:5432 --env POSTGRES_USER=antville --env POSTGRES_DB=antville --env POSTGRES_HOST_AUTH_METHOD=trust --volume mmt-local-db-data:/var/lib/postgresql/data postgres:16
+docker run --name mmt-local-db --detach --publish 127.0.0.1:5432:5432 --env POSTGRES_USER=antville --env POSTGRES_PASSWORD=change-me --env POSTGRES_DB=antville --volume mmt-local-db-data:/var/lib/postgresql/data postgres:16
 ```
 
 Это временная настройка для разработки на своём компьютере. Она слушает только `127.0.0.1` и не должна использоваться на сервере или в общей сети.
