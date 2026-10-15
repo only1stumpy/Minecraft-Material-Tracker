@@ -248,7 +248,6 @@ export async function POST(
             payload: { buildingName: material.building.name, materialName: material.name, completed: true },
           });
         }
-      }
         if (material.building.status === "COLLECTING") {
           const [activeMaterials, buildingGathered] = await Promise.all([
             tx.material.findMany({
@@ -295,6 +294,7 @@ export async function POST(
             }
           }
         }
+      }
       return { duplicate: false as const };
     }, { isolationLevel: "Serializable" });
 
