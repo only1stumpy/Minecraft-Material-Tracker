@@ -1,79 +1,228 @@
 # Minecraft Material Tracker (MMT)
 
-Minecraft Material Tracker (MMT) helps Minecraft cities and building groups plan large projects together. Every project has one shared card: the team can see what to build, which blocks are needed, who is collecting them, and what has already been delivered.
+Minecraft Material Tracker (MMT) — полноценный проект с открытым исходным кодом для Minecraft-городов, строительных команд и объединений. Он помогает договориться о том, **что строим, какие материалы нужны, кто их собирает и что уже доставлено**. Вместо разрозненных таблиц и сообщений команда работает с одной карточкой постройки и видит общий прогресс.
 
-MMT replaces scattered spreadsheets and chat messages with a clear, shared record of work. It is made for communities that run several builds at once and need to divide resource gathering without losing track of contributions.
+MMT подходит сообществам, которые ведут несколько построек одновременно и хотят разделить сбор ресурсов без потери вкладов участников. Интерфейс рассчитан на обычного игрока: действия объясняются прямо на экране, а изменения материалов, задач и статусов сохраняются в истории.
 
-MMT is an open-source project under the MIT License. You can inspect, run, change, and reuse the code under the terms in [`LICENSE`](LICENSE). This repository contains the site code; access to any hosted private service is managed separately by its owner.
+Это публичный проект с открытым исходным кодом: код находится в [репозитории GitHub](https://github.com/only1stumpy/Minecraft-Material-Tracker). Проект распространяется по лицензии MIT; полный текст условий находится в корневом файле [`LICENSE`](LICENSE). Код можно использовать, копировать и изменять при сохранении уведомления об авторских правах и текста лицензии; программное обеспечение предоставляется «как есть».
 
-## What the site can do
+Репозиторий содержит код сайта. Рабочий хостинговый сервис закрыт и управляется отдельно его владельцем: клонирование репозитория или развёртывание своей копии не даёт доступ к чужим аккаунтам и данным.
 
-### Plan and track builds
+## Возможности сайта
 
-- Keep a searchable catalog of builds with descriptions, screenshots, coordinates, owners, responsible players, status, and material progress.
-- Filter and sort the catalog, browse it page by page, show builds you own or participate in, save favorites, and hide finished builds.
-- Move a build through planning, resource collection, ready to build, construction, completion, pause, and archive.
-- Preview a build card before saving it, keep its edit history, and restore an earlier version when needed.
+Ниже перечислено то, что есть в текущем коде V2. Формулировка «есть в коде» не заменяет проверку внешней инфраструктуры: её состояние собрано в [матрице статуса V2](docs/v2-implementation-status.md).
 
-### Work with Minecraft materials
+### Доступ и аккаунты
 
-- Add a resource list by uploading a `.txt` or `.log` file, pasting a Litematica materials table, or entering items by hand.
-- Fix invalid lines before saving, merge duplicate items after confirmation, and add or remove rows later.
-- Set the required amount, stack size, and an optional per-item surplus limit.
-- Attach `.litematic` and Sponge `.schem` files privately. The site checks their structure and keeps the build's existing progress when a file is replaced.
-- Attach screenshots; the editor previews the card and accepts files by browsing or drag and drop.
-- Track each player's reserved, gathered, and delivered quantities separately. Partial collection, corrections, and releases are recorded without replacing another player's work.
-- See quantities as items, stacks, and shulker boxes, with support for non-standard stack sizes.
+- Закрытый вход по Minecraft-нику и паролю: самостоятельной регистрации на сайте нет.
+- Администратор создаёт аккаунт и выдаёт временный пароль; при первом входе игрок обязан заменить его.
+- Роли `PLAYER`, `MODERATOR` и `ADMIN` ограничивают доступ к действиям: игрок работает со своими карточками, модератор управляет общим контентом, администратор управляет аккаунтами и ролями.
+- В профиле можно сменить Minecraft-ник и пароль, а также завершить все активные сеансы.
 
-### Coordinate a team
+### Карточки построек
 
-- Assign a responsible player and construction tasks.
-- Add comments to a build or a specific material.
-- See other players' updates without manually reloading the page; the connection resumes after a brief interruption.
-- Receive in-site notifications for assignments, status changes, task completion, reservations, collection, delivery, comments, and role changes. Each player can choose which notifications to receive.
-- Review personal contribution, completed tasks, created builds, and a paginated activity history in the profile.
+- Создание карточки через `/buildings/new` и редактирование карточки через `/buildings/<id>`.
+- В карточке хранятся название, описание, статус, координаты `X / Y / Z`, владелец и ответственный участник.
+- К карточке можно приватно прикрепить схему `.litematic` или `.schem` и отдельный скриншот постройки. Для `.schem` сервер проверяет, что это настоящая Sponge-схема поддерживаемой версии, а не просто любой NBT-файл.
+- Перед сохранением редактор показывает предварительный вид карточки; файлы можно выбрать через диалог или перетащить мышью.
+- В карточке видны статус, общий прогресс, собрано, доставлено, оставшийся объём и список участников.
+- Статусы помогают пройти путь от черновика и планирования до сбора, готовности к строительству, строительства, завершения, паузы или архива.
+- История карточки хранит изменения: пользователь с правом управления может посмотреть ревизии и восстановить выбранную версию после подтверждения.
 
-### Manage shared city resources
+### Материалы и чек-лист
 
-- Use the city needs page to combine material requirements across active builds and see the remaining shortage.
-- Keep a personal mining list based on active reservations.
-- Track shared warehouse stock, reserved stock, available stock, and recent movements.
-- Let players reserve warehouse items; authorized staff can record incoming stock, usage, or a corrected total.
+- Материалы можно загрузить из текстового файла `.txt` или `.log`, вставить таблицу материалов из Litematica или добавить вручную.
+- Перед сохранением показываются ошибки разбора: строки можно исправить, добавить или удалить. Одинаковые материалы можно объединить после подтверждения.
+- Для каждой строки задаются нужное количество, размер стака и, если нужно, разрешение собрать больше расчётного объёма.
+- В чек-листе есть статусы «не начато», «в работе», «частично собрано», «полностью собрано» и «доставлено».
+- Есть поиск, фильтры «все», «мои», «свободные», «в работе» и «готовые», сортировка по названию, остатку и собранному количеству, а также скрытие завершённых строк. Материалы по умолчанию идут от большего требуемого количества к меньшему.
+- Игрок может зарезервировать свободный объём, отметить частично собранное и доставленное количество или освободить резерв. Одновременные действия сериализуются на сервере, поэтому два игрока не должны незаметно взять один и тот же объём.
+- Вклад хранится отдельно по каждому участнику и материалу. Модератор или администратор может исправить ошибочно записанный чужой сбор.
+- Количества показываются также в предметах, стаках и шалкерах, чтобы расчёт было проще перенести в игру. Поддерживаются нестандартные размеры стаков.
 
-### Give the right people the right access
+Файл схемы и список материалов — разные вещи. Прикрепление `.litematic` или `.schem` сохраняет файл для скачивания; сайт не извлекает из него таблицу материалов. Для заполнения чек-листа используйте `.txt`, `.log`, вставленную таблицу Litematica или ручной ввод.
 
-- The service is closed to public sign-up. Accounts are created by an administrator and use a Minecraft nickname.
-- `PLAYER` accounts participate in builds and manage their own cards. `MODERATOR` accounts can manage shared content and moderate comments. `ADMIN` accounts also manage users, roles, and account access.
-- Moderators can find, hide, and restore builds and comments, review similar titles and import errors, and manage the shared warehouse.
-- Administrators can create or block accounts, change roles and nicknames, issue a temporary password, review contributions, and inspect the audit log.
-- The owner-facing steps for adding a moderator are in [`docs/production-moderator.md`](docs/production-moderator.md).
+### Каталог и избранное
 
-## What MMT does not do
+- Каталог на `/` ищет по названию, описанию и нику владельца.
+- Результаты можно фильтровать по статусу, сортировать по дате, названию или прогрессу и листать по страницам.
+- Есть отдельные режимы «Мои постройки», «Я участвую» и «Избранное», а также переключатель «Скрыть завершённые».
 
-- It does not connect to a Minecraft game server or verify in-game events.
-- It does not send Telegram messages. Both integrations are future directions; builds and resource tracking work without them.
-- It does not import data from the earlier SQLite version. A local run starts with a separate, empty version 2 database.
-- It does not provide public self-registration. A hosted community's administrator creates accounts.
+### Совместная работа
 
-## Run your own local copy
+- В карточке можно оставить общий комментарий или комментарий к конкретному материалу.
+- Пользователь с правом управления карточкой создаёт задачу, назначает её по Minecraft-нику, а исполнитель берёт задачу и отмечает её выполненной.
+- Изменения карточки, материалов, комментариев и задач автоматически появляются на открытой странице. Для этого используется короткое соединение для передачи событий от сервера (SSE), доступное только после входа. Отдельный игровой сервер для синхронизации не нужен.
+- Внутренние уведомления сообщают о назначениях, смене статуса, завершении задачи, резервациях, сборе, доставке, комментариях и смене роли. Каждый игрок может выбрать, какие уведомления получать.
 
-The source code is public, but the hosted service is private. To try MMT, clone the repository and run a separate local copy with your own local database. The beginner-friendly guide explains each command, first local account, file storage setup, and common errors:
+### Склад и потребности города
 
-- [Clone and run the site locally](docs/local-development.md)
-- [Full version 2.0 specification](docs/antville-builder-2.0.md)
-- [Implementation status by specification section](docs/v2-implementation-status.md)
+- `/city-needs` собирает потребности активных построек в одну таблицу: показывает общий нужный объём, учтённый вклад проектов и дефицит.
+- Там же есть личный список добычи: свои активные резервации можно открыть, выполнять и освобождать.
+- Вклад проекта считается один раз по максимальному из собранного и доставленного количества, после чего из общей потребности вычитается остаток склада один раз.
+- В `/warehouse` видны остатки материалов и последние движения. Для каждого материала отдельно показаны общий запас, объём, зарезервированный игроками, и свободный остаток.
+- Игрок может зарезервировать и освободить складской объём, а модератор и администратор — записать приход, расход или точный итоговый остаток.
 
-Local users and builds stay on your machine. They do not appear in anyone else's hosted service.
+### Уведомления и профиль
 
-## Project checks
+- В `/notifications` есть внутренний центр уведомлений с отметкой «прочитано» и загрузкой следующих страниц.
+- В настройках уведомлений можно включить или отключить сообщения о назначении, смене статуса, завершении задачи, резерве и сборе материалов, доставке, комментариях и смене роли.
+- `/profile` показывает вклад: созданные проекты и проекты с вашим вкладом, собранные и доставленные предметы, закрытые задачи и постраничную историю операций без жёсткого ограничения в десять записей.
+- В профиле можно сменить Minecraft-ник и пароль, а также завершить все активные сеансы.
 
-The project uses Next.js, React, TypeScript, Prisma, and PostgreSQL. Before proposing code changes, run:
+### Модерация и администрирование
+
+- `/moderation` доступен `MODERATOR` и `ADMIN`: там можно искать карточки и комментарии, скрывать и восстанавливать их, просматривать похожие названия и последние записи импорта.
+- `/admin` доступен только `ADMIN`: администратор создаёт аккаунты `PLAYER`, `MODERATOR` и `ADMIN`, блокирует и разблокирует пользователей, меняет роли и ники, выдаёт новый временный пароль, смотрит вклад участников и журнал важных действий.
+- `PLAYER` участвует в строительстве и управляет своими карточками. `MODERATOR` может управлять любыми карточками, исправлять вклад и модерировать комментарии, а также менять общий склад. `ADMIN` получает эти права и дополнительно управляет аккаунтами и ролями.
+- Порядок выдачи роли модератора описан в [инструкции для владельца рабочего сайта](docs/production-moderator.md).
+
+### Защита и эксплуатация
+
+- Все изменяющие API проверяют сессию, роль, источник запроса и входные данные. Для таких запросов действует серверное ограничение частоты запросов с отдельными счётчиками по пользователю и операции; при превышении сайт отвечает HTTP `429` и сообщает, когда повторить запрос.
+- Файлы схем и скриншоты лежат в закрытом хранилище Vercel Blob. Резервная копия PostgreSQL создаётся и проверяется через `pg_restore`, а снимок хранилища Blob содержит манифест, размеры и SHA-256 каждого файла. Команды и ограничения восстановления описаны в [инструкции по эксплуатации](docs/stage-1-operations.md).
+
+## Ограничения текущей версии
+
+- Открытой самостоятельной регистрации нет. В развёрнутом сервисе аккаунт создаёт администратор и передаёт игроку временный пароль. После первого входа пароль нужно заменить.
+- Прямой интеграции с Minecraft-сервером и Telegram нет. Сайт не читает игровые события и не отправляет внешние Telegram-сообщения.
+- Локальный запуск создаёт пустую базу PostgreSQL. V2 не импортирует старую SQLite-БД; сохранённый скрипт [`scripts/migrate-sqlite-buildings.mjs`](scripts/migrate-sqlite-buildings.mjs) — отдельный устаревший служебный инструмент вне сайта и рабочего выпуска, который запускают только по отдельному решению владельца проекта.
+- Для загрузки схем и скриншотов нужен настроенный приватный Vercel Blob. Без токена сайт запускается, но загрузка файлов не завершится.
+- Команды создания снимков не включают автоматическое расписание, внешнее шифрование или проверенное восстановление рабочего окружения. Это обязанность владельца окружения и отдельно отмечено в [матрице статуса V2](docs/v2-implementation-status.md).
+
+## Быстрый локальный запуск
+
+Нужны Git, Node.js `22.12+` в ветке `22.x` или `24.11+` в ветке `24.x`, npm и локальный PostgreSQL. Самый простой путь — запустить PostgreSQL в Docker. Полная инструкция для новичков находится в [руководстве локального запуска](docs/local-development.md).
 
 ```sh
-npm run lint
-npm run typecheck
-npm test
-npm run build
+git clone https://github.com/only1stumpy/Minecraft-Material-Tracker.git
+cd Minecraft-Material-Tracker
+cp .env.example .env
+npm ci
+npx prisma validate
+npm run db:deploy
+npm run admin:bootstrap -- MinecraftNick
+npm run dev
 ```
 
-CI also checks the database migrations and backup restore flow using test data. See [`docs/local-development.md`](docs/local-development.md) for the full local setup and troubleshooting steps.
+В `.env` укажите `DATABASE_URL` для своей локальной базы. `BLOB_READ_WRITE_TOKEN` можно оставить пустым, если локально не нужны загрузки файлов. Откройте [http://localhost:3000](http://localhost:3000) и войдите с ником и временным паролем, который показала команда `admin:bootstrap`.
+
+Локальная копия использует отдельную пустую базу. Её пользователи и постройки не появляются в закрытом рабочем сервисе.
+
+## Архитектура и правила работы
+
+- PostgreSQL — источник истины; права и валидация проверяются в API.
+- Материалы, вклад игроков, резервации, доставка, задачи и версии карточек хранятся отдельно со стабильными ID.
+- Операции со сбором выполняются атомарно в сериализуемых транзакциях. Клиент передаёт UUID операции, поэтому повтор запроса не должен удвоить действие.
+- Схемы и скриншоты хранятся в приватном Vercel Blob. Доступ выдаёт авторизованный серверный маршрут.
+- `.schem` принимается только после проверки структуры Sponge v2/v3 и целостности NBT; размер сжатого и распакованного файла ограничен.
+- Карточки синхронизируются через защищённый поток событий сервера с курсором изменений, сигналом работы соединения и автоматическим переподключением. Отдельный WebSocket-сервис не используется.
+- Загрузка списков материалов ограничивает размер и формат файлов. Исходные данные списка сохраняются как снимок рядом с нормализованными записями.
+- Секреты не хранятся в репозитории. Файл `.env` игнорируется Git.
+
+## Основные команды
+
+| Команда | Назначение |
+| --- | --- |
+| `npm run dev` | Локальная разработка |
+| `npm run build` | Собрать сайт |
+| `npm run lint` | Проверка ESLint |
+| `npm run typecheck` | Проверка TypeScript |
+| `npm test` | Модульные тесты материалов, прав, парсинга списков и NBT |
+| `npm run db:deploy` | Применить миграции Prisma к PostgreSQL |
+| `npm run db:backup` | Создать и проверить локальную резервную копию PostgreSQL |
+| `npm run db:restore -- /path/to/backup.dump` | Проверить и восстановить копию только в явно изолированную базу через `RESTORE_DATABASE_URL=... RESTORE_TARGET_ISOLATED=YES` |
+| `npm run blob:backup -- /path/to/blob-snapshot` | Скачать файлы из закрытого хранилища Blob в снимок с `manifest.json` и SHA-256 |
+| `npm run blob:restore -- /path/to/blob-snapshot` | Восстановить отсутствующие файлы Blob и проверить совпадение размера и SHA-256 |
+| `npm run admin:bootstrap -- MinecraftNick` | Создать первого локального администратора |
+| `npm run admin:grant-moderator -- MinecraftNick` | Выдать роль модератора существующему игроку |
+| `npm run region:measure -- fra1=https://.../api/health arn1=https://.../api/health` | Сравнить задержку региона из текущей сети |
+
+Перед выпуском рабочей версии используйте [инструкцию по развёртыванию и восстановлению](docs/stage-1-operations.md). Полное техническое задание версии 2.0 находится в [документе требований](docs/antville-builder-2.0.md), а реализация по разделам и этапам — в [матрице статуса V2](docs/v2-implementation-status.md).
+
+## Разверните свою копию в Vercel
+
+Этот раздел предназначен для владельца отдельного Minecraft-сообщества. Развёртывание создаёт новый проект Vercel и, при необходимости, новую копию репозитория в вашем GitHub. Оно **не даёт доступ к закрытому рабочему сервису MMT**, его аккаунтам, базе или файлам.
+
+Кнопка использует официальный [формат Vercel Deploy Button](https://vercel.com/docs/deploy-button). Она попросит адрес базы `DATABASE_URL`; секреты нельзя помещать в ссылку. После первого развёртывания подключите закрытое хранилище Blob к проекту — Vercel сам добавит нужный токен. Подробнее — в [документации Vercel о переменных для кнопки](https://vercel.com/docs/deploy-button/environment-variables) и [руководстве по закрытому Blob-хранилищу](https://vercel.com/docs/vercel-blob/private-storage).
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fonly1stumpy%2FMinecraft-Material-Tracker&env=DATABASE_URL&envDescription=%D0%A3%D0%BA%D0%B0%D0%B6%D0%B8%D1%82%D0%B5%20%D1%81%D1%82%D1%80%D0%BE%D0%BA%D1%83%20%D0%BF%D0%BE%D0%B4%D0%BA%D0%BB%D1%8E%D1%87%D0%B5%D0%BD%D0%B8%D1%8F%20%D0%BA%20%D0%B2%D0%B0%D1%88%D0%B5%D0%B9%20PostgreSQL%20%D0%B1%D0%B0%D0%B7%D0%B5%20%D0%B2%20DATABASE_URL&envLink=https%3A%2F%2Fgithub.com%2Fonly1stumpy%2FMinecraft-Material-Tracker%23%D1%87%D1%82%D0%BE-%D0%BF%D0%BE%D0%B4%D0%B3%D0%BE%D1%82%D0%BE%D0%B2%D0%B8%D1%82%D1%8C-%D0%B7%D0%B0%D1%80%D0%B0%D0%BD%D0%B5%D0%B5)
+
+### Что подготовить заранее
+
+1. Аккаунт Vercel, связанный с GitHub.
+2. Собственную PostgreSQL-базу, доступную из Vercel. Её можно создать у любого подходящего провайдера; также Vercel предлагает базы через [каталог сервисов](https://vercel.com/docs/marketplace-storage). Скопируйте строку подключения: она понадобится как значение `DATABASE_URL`. Проверьте условия и цену тарифа выбранного провайдера.
+
+Адрес `localhost` для рабочей версии не подойдёт. Если провайдер предлагает несколько строк подключения, выберите ту, которую он рекомендует для серверных приложений. Приложение размещает функции в Стокгольме (`arn1`), поэтому при выборе региона базы отдайте предпочтение ближайшему доступному. Заранее создавать хранилище Vercel Blob не нужно: подключите его к новому проекту после первого развёртывания по инструкции ниже.
+
+Кнопка попросит указать одну обязательную переменную:
+
+- `DATABASE_URL` — строка подключения к вашей PostgreSQL.
+
+Не вставляйте значение в ссылку кнопки, README, Git или сообщения. Vercel покажет поле для ввода при создании проекта.
+
+### Пошаговое развёртывание
+
+1. Нажмите кнопку `Deploy with Vercel` выше.
+2. Войдите в Vercel и выберите GitHub-аккаунт или команду, где должна жить ваша копия.
+3. Введите `DATABASE_URL` своей базы PostgreSQL. Не используйте адрес `localhost`: база должна принимать подключения из Vercel.
+4. Нажмите кнопку запуска развёртывания и дождитесь успешной сборки.
+5. Откройте выданный Vercel адрес. Первый экран будет закрытым входом, пока вы не создадите первого администратора.
+
+Vercel использует настройки из [`vercel.json`](vercel.json). Перед сборкой рабочей версии выполняется `npm run db:deploy`, поэтому миграции Prisma применяются автоматически. Не подключайте к этой копии базу другой команды и не запускайте сброс базы вместо миграций.
+
+### Подключить закрытое хранилище файлов
+
+Без Blob-хранилища сайт открывается, но загрузка схем и скриншотов не работает. После создания проекта:
+
+1. Откройте проект в Vercel и перейдите в раздел `Storage`.
+2. Создайте хранилище типа Blob с доступом `Private` и включите его для среды `Production`.
+3. Vercel сам добавит в проект переменную `BLOB_READ_WRITE_TOKEN`. Не копируйте её в репозиторий.
+4. Запустите повторное развёртывание последней версии проекта: новые переменные среды применяются только к новым развёртываниям.
+
+### Создать первого администратора после развёртывания
+
+Администратор нужен, потому что публичной регистрации в MMT нет. Команда запускается из клонированного репозитория и передаёт переменные рабочей среды Vercel только этому процессу.
+
+1. Установите Git, Node.js подходящей версии и Vercel CLI через `npx`.
+2. Скачайте исходный репозиторий или копию, созданную для вас при развёртывании, и перейдите в её папку. Команда ниже скачивает публичный исходный репозиторий:
+
+   ```sh
+   git clone https://github.com/only1stumpy/Minecraft-Material-Tracker.git
+   cd Minecraft-Material-Tracker
+   ```
+
+3. Войдите в Vercel:
+
+   ```sh
+   npx vercel login
+   ```
+
+4. Привяжите папку к только что созданному проекту Vercel. В списке выберите правильную команду и проект:
+
+   ```sh
+   npx vercel link
+   ```
+
+5. Установите зависимости:
+
+   ```sh
+   npm ci
+   ```
+
+6. Запустите команду создания администратора, заменив `MinecraftNick` на Minecraft-ник первого администратора:
+
+   ```sh
+   npx vercel env run -e production -- npm run admin:bootstrap -- MinecraftNick
+   ```
+
+Команда создаёт первого администратора в вашей рабочей базе и выводит временный пароль один раз. Сохраните его, войдите на адрес Vercel и сразу задайте постоянный пароль. Она не записывает `DATABASE_URL` в локальный файл.
+
+Если команда сообщает, что администратор уже существует, используйте уже созданный аккаунт или попросите его владельца добавить вас через `/admin`. Не запускайте команду создания первого администратора повторно на чужом проекте.
+
+### Если развёртывание не прошло
+
+- Ошибка подключения к базе обычно означает, что в `DATABASE_URL` указан неправильный адрес, база недоступна из Vercel или строка подключения содержит ошибку.
+- Если сайт открывается, но схема или скриншот не загружается, проверьте `BLOB_READ_WRITE_TOKEN` и убедитесь, что это токен вашего Vercel Blob.
+- Если миграция не выполнилась, откройте журнал сборки рабочей версии и проверьте доступ к PostgreSQL. Повторное развёртывание запускает ту же команду `npm run db:deploy`.
+- Не публикуйте значения переменных окружения в обращении на GitHub, чате, скриншоте или репозитории. При утечке токена замените его в Vercel.
