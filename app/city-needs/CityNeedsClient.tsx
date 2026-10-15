@@ -11,7 +11,6 @@ export type CityNeedProject = {
   statusLabel: string;
   required: number;
   gathered: number;
-  delivered: number;
   remaining: number;
   reservations: CityNeedReservationView[];
 };
@@ -27,7 +26,6 @@ export type CityNeedView = {
   normalizedName: string;
   required: number;
   gathered: number;
-  delivered: number;
   covered: number;
   projectRemaining: number;
   warehouseQuantity: number;
@@ -153,7 +151,7 @@ export default function CityNeedsClient({ initialNeeds }: Props) {
       </section>
       {visibleNeeds.length === 0 ? <p className="glass-panel-soft rounded-2xl p-6 text-[var(--muted)]">Активных потребностей по этому фильтру нет.</p> : <div className="grid gap-4">{visibleNeeds.map((row) => <article key={row.normalizedName} className="glass-panel rounded-3xl p-5">
         <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-xl font-semibold text-white">{row.name}</h2><p className="mt-1 text-xs text-[var(--muted-strong)]">Нормализованное имя: {row.normalizedName}</p></div><div className="text-right"><p className="text-2xl font-semibold text-rose-100">{numberFormatter.format(row.needed)}</p><p className="text-xs text-[var(--muted)]">осталось добыть</p></div></div>
-        <div className="mt-4 grid gap-3 text-sm sm:grid-cols-4"><div className="rounded-xl border border-white/8 bg-black/25 p-3"><span className="text-[var(--muted-strong)]">Требуется</span><b className="mt-1 block text-white">{numberFormatter.format(row.required)}</b></div><div className="rounded-xl border border-white/8 bg-black/25 p-3"><span className="text-[var(--muted-strong)]">Собрано</span><b className="mt-1 block text-white">{numberFormatter.format(row.gathered)}</b></div><div className="rounded-xl border border-white/8 bg-black/25 p-3"><span className="text-[var(--muted-strong)]">Доставлено</span><b className="mt-1 block text-white">{numberFormatter.format(row.delivered)}</b></div><div className="rounded-xl border border-rose-300/20 bg-rose-950/20 p-3"><span className="text-[var(--muted-strong)]">На складе</span><b className="mt-1 block text-rose-100">{numberFormatter.format(row.warehouseQuantity)}</b></div></div>
+        <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3"><div className="rounded-xl border border-white/8 bg-black/25 p-3"><span className="text-[var(--muted-strong)]">Требуется</span><b className="mt-1 block text-white">{numberFormatter.format(row.required)}</b></div><div className="rounded-xl border border-white/8 bg-black/25 p-3"><span className="text-[var(--muted-strong)]">Собрано</span><b className="mt-1 block text-white">{numberFormatter.format(row.gathered)}</b></div><div className="rounded-xl border border-rose-300/20 bg-rose-950/20 p-3"><span className="text-[var(--muted-strong)]">На складе</span><b className="mt-1 block text-rose-100">{numberFormatter.format(row.warehouseQuantity)}</b></div></div>
         <p className="mt-4 text-sm text-[var(--muted)]">Остаток по проектам: <b className="text-slate-200">{numberFormatter.format(row.projectRemaining)}</b> · покрыто вкладом: <b className="text-slate-200">{numberFormatter.format(row.covered)}</b>. Склад вычтен один раз.</p>
         <ul className="mt-4 space-y-2 border-t border-white/8 pt-4">{row.projects.map((project) => <li key={project.materialId} className="rounded-xl bg-black/25 px-3 py-2 text-sm"><div className="flex flex-wrap items-center justify-between gap-3"><Link href={`/buildings/${project.buildingId}#material-${project.materialId}`} className="text-rose-200 hover:text-rose-100 hover:underline">{project.buildingName}</Link><span className="text-[var(--muted)]">{project.statusLabel} · осталось {numberFormatter.format(project.remaining)}</span></div><div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--muted-strong)]"><span>Мой резерв: {numberFormatter.format(project.reservations.reduce((sum, reservation) => sum + reservation.quantity - reservation.gatheredQty, 0))}</span><button type="button" onClick={() => reserve(project)} disabled={busy !== null || project.remaining < 1} className="glass-control rounded-lg px-3 py-1.5 text-rose-100 disabled:opacity-50">{busy === project.materialId ? "Сохраняем…" : "Зарезервировать"}</button></div>{project.reservations.length > 0 && <ul className="mt-2 space-y-1 border-t border-white/8 pt-2">{project.reservations.map((reservation) => <li key={reservation.id} className="flex flex-wrap items-center justify-between gap-2"><span>{numberFormatter.format(reservation.quantity - reservation.gatheredQty)} шт. в личном списке</span><button type="button" onClick={() => release(project, reservation)} disabled={busy !== null} className="text-rose-200 hover:text-rose-100 disabled:opacity-50">Освободить</button></li>)}</ul>}</li>)}</ul>
       </article>)}</div>}
