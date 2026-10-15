@@ -119,7 +119,6 @@ export default async function BuildingPage({
             select: {
               userId: true,
               gatheredQty: true,
-              deliveredQty: true,
               user: { select: { minecraftNickname: true } },
             },
           },
@@ -194,10 +193,6 @@ export default async function BuildingPage({
     (sum, item) => sum + item.contributions.reduce((partial, contribution) => partial + BigInt(contribution.gatheredQty), BigInt(0)),
     BigInt(0),
   );
-  const totalDelivered = building.materials.reduce(
-    (sum, item) => sum + item.contributions.reduce((partial, contribution) => partial + BigInt(contribution.deliveredQty), BigInt(0)),
-    BigInt(0),
-  );
   const progress = totalRequired === BigInt(0) ? 0 : quantityPercentComplete(totalGathered, totalRequired);
   const participantCount = collectParticipantIds(building.materials).size;
 
@@ -226,7 +221,7 @@ export default async function BuildingPage({
           </div>
           <div className="mt-7 grid gap-4 sm:grid-cols-3">
             <div className="glass-panel-soft rounded-2xl p-4"><p className="text-sm text-slate-400">Сбор материалов</p><p className="mt-1 text-2xl font-semibold">{progress}%</p><div className="mt-3 h-2 rounded-full bg-slate-800"><div className="h-2 rounded-full bg-rose-300" style={{ width: `${progress}%` }} /></div></div>
-            <div className="glass-panel-soft rounded-2xl p-4"><p className="text-sm text-slate-400">Собрано / доставлено</p><p className="mt-1 text-2xl font-semibold">{formatQuantity(totalGathered)} / {formatQuantity(totalDelivered)}</p></div>
+            <div className="glass-panel-soft rounded-2xl p-4"><p className="text-sm text-slate-400">Собрано в сундук</p><p className="mt-1 text-2xl font-semibold">{formatQuantity(totalGathered)}</p></div>
             <div className="glass-panel-soft rounded-2xl p-4"><p className="text-sm text-slate-400">Участники сбора</p><p className="mt-1 text-2xl font-semibold">{participantCount}</p></div>
           </div>
         </header>
