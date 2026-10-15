@@ -8,7 +8,7 @@ import { canModerateContent } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { checkMutationRateLimit, validateSameOrigin } from "@/lib/security";
 
-type Action = "reserve" | "release" | "gather" | "deliver" | "correct";
+type Action = "reserve" | "release" | "gather" | "correct";
 type CorrectionDirection = "add" | "remove";
 const MAX_INT = 2_147_483_647;
 type RequestBody = {
@@ -24,7 +24,7 @@ const isUuid = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 const isAction = (value: unknown): value is Action =>
-  value === "reserve" || value === "release" || value === "gather" || value === "deliver" || value === "correct";
+  value === "reserve" || value === "release" || value === "gather" || value === "correct";
 
 const isCorrectionDirection = (value: unknown): value is CorrectionDirection => value === "add" || value === "remove";
 
@@ -74,7 +74,7 @@ export async function POST(
           name: true,
           requiredQty: true,
           surplusLimit: true,
-          building: { select: { id: true, name: true, status: true, deletedAt: true, ownerId: true, responsibleId: true } },
+          building: { select: { id: true, name: true, status: true, version: true, deletedAt: true, ownerId: true, responsibleId: true } },
         },
       });
       if (!material) throw new OperationError("Материал не найден", 404);
@@ -90,7 +90,7 @@ export async function POST(
 
       let delta = quantity;
       let reservationId: string | null = null;
-      let activityKind: "RESERVED" | "RELEASED" | "GATHERED" | "DELIVERED" | "CORRECTED";
+      let activityKind: "RESERVED" | "RELEASED" | "GATHERED" | "CORRECTED";
 
       if (action === "reserve") {
         const [totals, activeReservations] = await Promise.all([
@@ -153,19 +153,6 @@ export async function POST(
         });
         reservationId = reservation.id;
         activityKind = "GATHERED";
-      } else if (action === "deliver") {
-        const contribution = await tx.materialContribution.findUnique({
-          where: { materialId_userId: { materialId, userId: actor.id } },
-          select: { gatheredQty: true, deliveredQty: true },
-        });
-        if (!contribution || quantity > contribution.gatheredQty - contribution.deliveredQty) {
-          throw new OperationError("Количество превышает собранный, но ещё не доставленный остаток", 409);
-        }
-        await tx.materialContribution.update({
-          where: { materialId_userId: { materialId, userId: actor.id } },
-          data: { deliveredQty: { increment: quantity } },
-        });
-        activityKind = "DELIVERED";
       } else {
         const reservation = await tx.materialReservation.findFirst({
           where: { id: body.reservationId as string, materialId, userId: targetUserId },
@@ -199,12 +186,12 @@ export async function POST(
           await tx.materialReservation.update({ where: { id: reservation.id }, data: { gatheredQty: { increment: quantity } } });
           delta = quantity;
         } else {
-          if (!contribution || quantity > reservation.gatheredQty || quantity > contribution.gatheredQty - contribution.deliveredQty) {
-            throw new OperationError("Коррекция не может убрать доставленное количество", 409);
+          if (!contribution || quantity > reservation.gatheredQty || quantity > contribution.gatheredQty) {
+            throw new OperationError("Коррекция не может убрать больше собранного", 409);
           }
           await tx.materialContribution.update({
             where: { materialId_userId: { materialId, userId: targetUserId } },
-            data: { gatheredQty: { decrement: quantity } },
+            data: { gatheredQty: contribution.gatheredQty - quantity, deliveredQty: Math.min(contribution.deliveredQty, contribution.gatheredQty - quantity) },
           });
           await tx.materialReservation.update({ where: { id: reservation.id }, data: { gatheredQty: { decrement: quantity } } });
           delta = -quantity;
@@ -246,20 +233,66 @@ export async function POST(
         });
       }
 
-      if (activityKind === "GATHERED" || activityKind === "DELIVERED") {
-        const totals = await tx.materialContribution.aggregate({ where: { materialId }, _sum: { gatheredQty: true, deliveredQty: true } });
-        const currentTotal = activityKind === "GATHERED" ? totals._sum.gatheredQty ?? 0 : totals._sum.deliveredQty ?? 0;
+      if (activityKind === "GATHERED") {
+        const totals = await tx.materialContribution.aggregate({ where: { materialId }, _sum: { gatheredQty: true } });
+        const currentTotal = totals._sum.gatheredQty ?? 0;
         const previousTotal = currentTotal - quantity;
         if (material.requiredQty > 0 && previousTotal < material.requiredQty && currentTotal >= material.requiredQty) {
           const contributors = await tx.materialContribution.findMany({ where: { materialId }, select: { userId: true } });
           await createUserNotifications(tx, {
             recipientIds: [material.building.ownerId, material.building.responsibleId, ...contributors.map((entry) => entry.userId)],
             actorId: actor.id,
-            kind: activityKind === "GATHERED" ? "MATERIAL_GATHERED" : "MATERIAL_DELIVERED",
+            kind: "MATERIAL_GATHERED",
             buildingId,
             entityId: materialId,
             payload: { buildingName: material.building.name, materialName: material.name, completed: true },
           });
+        }
+        if (material.building.status === "COLLECTING") {
+          const [activeMaterials, buildingGathered] = await Promise.all([
+            tx.material.findMany({
+              where: { buildingId, isArchived: false },
+              select: { requiredQty: true },
+            }),
+            tx.materialContribution.aggregate({
+              where: { material: { buildingId, isArchived: false } },
+              _sum: { gatheredQty: true },
+            }),
+          ]);
+          const requiredQty = activeMaterials.reduce((sum, row) => sum + row.requiredQty, 0);
+          const gatheredQty = buildingGathered._sum.gatheredQty ?? 0;
+          if (!Number.isSafeInteger(requiredQty) || !Number.isSafeInteger(gatheredQty)) {
+            throw new OperationError("Сумма материалов превышает безопасный диапазон", 409);
+          }
+
+          if (requiredQty > 0 && gatheredQty >= requiredQty) {
+            const transition = await tx.building.updateMany({
+              where: { id: buildingId, deletedAt: null, status: "COLLECTING" },
+              data: { status: "READY", version: { increment: 1 } },
+            });
+            if (transition.count === 1) {
+              await tx.auditLog.create({
+                data: {
+                  actorId: actor.id,
+                  action: "BUILDING_STATUS_CHANGED",
+                  entityType: "Building",
+                  entityId: buildingId,
+                  metadata: { previousStatus: "COLLECTING", status: "READY", version: material.building.version + 1, automatic: true },
+                },
+              });
+              const contributors = await tx.materialContribution.findMany({
+                where: { material: { buildingId, isArchived: false } },
+                select: { userId: true },
+              });
+              await createUserNotifications(tx, {
+                recipientIds: [material.building.ownerId, material.building.responsibleId, ...contributors.map((entry) => entry.userId)],
+                actorId: actor.id,
+                kind: "BUILDING_STATUS_CHANGED",
+                buildingId,
+                payload: { buildingName: material.building.name, previousStatus: "COLLECTING", status: "READY" },
+              });
+            }
+          }
         }
       }
       return { duplicate: false as const };

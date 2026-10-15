@@ -3,17 +3,17 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const NOTIFICATION_KINDS = [
+const PREFERENCE_KINDS = [
   "BUILDING_ASSIGNED",
   "BUILDING_STATUS_CHANGED",
   "MATERIAL_RESERVED",
   "MATERIAL_GATHERED",
-  "MATERIAL_DELIVERED",
   "COMMENT_ADDED",
   "ROLE_CHANGED",
 ] as const;
 
-type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+type PreferenceKind = (typeof PREFERENCE_KINDS)[number];
+type NotificationKind = PreferenceKind | "MATERIAL_DELIVERED";
 
 type NotificationItem = {
   id: string;
@@ -26,7 +26,7 @@ type NotificationItem = {
   actor: { minecraftNickname: string } | null;
 };
 
-type Preference = { kind: NotificationKind; enabled: boolean };
+type Preference = { kind: PreferenceKind; enabled: boolean };
 
 type NotificationsResponse = {
   error?: string;
@@ -66,7 +66,7 @@ export default function NotificationsClient() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [savingKind, setSavingKind] = useState<NotificationKind | null>(null);
+  const [savingKind, setSavingKind] = useState<PreferenceKind | null>(null);
   const [error, setError] = useState("");
 
   async function loadNotifications(nextPage: number, append: boolean) {
@@ -120,7 +120,7 @@ export default function NotificationsClient() {
     }
   }
 
-  async function togglePreference(kind: NotificationKind, enabled: boolean) {
+  async function togglePreference(kind: PreferenceKind, enabled: boolean) {
     const previous = preferences;
     setSavingKind(kind);
     setPreferences((items) => items.map((item) => item.kind === kind ? { ...item, enabled } : item));
@@ -172,7 +172,7 @@ export default function NotificationsClient() {
         <section className="space-y-4">
           <div><p className="glass-eyebrow">Контроль сигнала</p><h2 className="mt-2 text-2xl font-semibold text-white">Настройки уведомлений</h2></div>
           <div className="glass-panel divide-y divide-white/8 overflow-hidden rounded-3xl">
-            {NOTIFICATION_KINDS.map((kind) => {
+            {PREFERENCE_KINDS.map((kind) => {
               const preference = preferences.find((item) => item.kind === kind);
               const enabled = preference?.enabled ?? true;
               return <label key={kind} className="flex cursor-pointer items-center justify-between gap-4 p-4 transition hover:bg-white/[0.025]"><span>{KIND_LABELS[kind]}</span><input type="checkbox" checked={enabled} disabled={savingKind === kind} onChange={(event) => void togglePreference(kind, event.target.checked)} className="h-5 w-5 accent-[var(--accent-strong)]" /></label>;

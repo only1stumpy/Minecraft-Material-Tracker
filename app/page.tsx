@@ -43,7 +43,6 @@ type CatalogQueryRow = {
   screenshotPath: string | null;
   requiredQty: string;
   gatheredQty: string;
-  deliveredQty: string;
   participantCount: string;
   isFavorite: boolean;
 };
@@ -195,7 +194,6 @@ export default async function Home({
       b."screenshotPath",
       COALESCE(material_totals."requiredQty", 0::numeric)::text AS "requiredQty",
       COALESCE(material_totals."gatheredQty", 0::numeric)::text AS "gatheredQty",
-      COALESCE(material_totals."deliveredQty", 0::numeric)::text AS "deliveredQty",
       COALESCE(participant_totals."participantCount", '0') AS "participantCount",
       EXISTS (
         SELECT 1 FROM "Favorite" favorite_row
@@ -224,7 +222,6 @@ export default async function Home({
     LEFT JOIN (
       SELECT required."buildingId", required."requiredQty",
              COALESCE(contribution."gatheredQty", 0) AS "gatheredQty",
-             COALESCE(contribution."deliveredQty", 0) AS "deliveredQty",
              COALESCE(contribution."participantCount", 0) AS "participantCount"
       FROM (
         SELECT "buildingId", SUM("requiredQty"::numeric) AS "requiredQty"
@@ -235,7 +232,6 @@ export default async function Home({
       LEFT JOIN (
         SELECT material."buildingId",
                COALESCE(SUM(contribution."gatheredQty"::numeric), 0::numeric) AS "gatheredQty",
-               COALESCE(SUM(contribution."deliveredQty"::numeric), 0::numeric) AS "deliveredQty",
                COUNT(DISTINCT contribution."userId") FILTER (WHERE contribution."gatheredQty" > 0) AS "participantCount"
         FROM "Material" material
         LEFT JOIN "MaterialContribution" contribution ON contribution."materialId" = material."id"
@@ -295,7 +291,6 @@ export default async function Home({
     screenshotPath: row.screenshotPath,
     requiredQty: normalizeQuantity(row.requiredQty) as QuantityValue,
     gatheredQty: normalizeQuantity(row.gatheredQty) as QuantityValue,
-    deliveredQty: normalizeQuantity(row.deliveredQty) as QuantityValue,
     participantCount: normalizeQuantity(row.participantCount) as QuantityValue,
     isFavorite: row.isFavorite,
   }));

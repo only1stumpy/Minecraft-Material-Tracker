@@ -22,7 +22,6 @@ export type BuildingCatalogBuilding = {
   screenshotPath: string | null;
   requiredQty: QuantityValue;
   gatheredQty: QuantityValue;
-  deliveredQty: QuantityValue;
   participantCount: QuantityValue;
   isFavorite: boolean;
 };
@@ -241,7 +240,6 @@ function BuildingCard({ building }: { building: BuildingCatalogBuilding }) {
             <div className="h-full rounded-full bg-gradient-to-r from-rose-900 to-rose-300 transition-[width]" style={{ width: `${progress}%` }} />
           </div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-            <span>Доставлено: {formatCount(building.deliveredQty)}</span>
             <span>{building.isFavorite ? "★ В избранном" : "☆ Не в избранном"}</span>
           </div>
         </div>
