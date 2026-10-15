@@ -179,20 +179,8 @@ export default async function Home({
   const requestedPage = parsePage(params.page);
 
   const whereSql = buildWhereSql({ q, status, mine, participated, favorites, hideCompleted, userId: user.id });
-  const [{ count }] = await prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
-    SELECT COUNT(*)::integer AS count
-    FROM "Building" b
-    LEFT JOIN "User" owner ON owner."id" = b."ownerId"
-    WHERE ${whereSql}
-  `);
-
-  const total = Math.max(0, count ?? 0);
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const page = Math.min(requestedPage, pageCount);
-  const offset = (page - 1) * PAGE_SIZE;
   const orderBy = orderBySql(sort);
-
-  const rows = await prisma.$queryRaw<CatalogQueryRow[]>(Prisma.sql`
+  const fetchCatalogRows = (offset: number) => prisma.$queryRaw<CatalogQueryRow[]>(Prisma.sql`
     SELECT
       b."id",
       b."name",
@@ -274,6 +262,24 @@ export default async function Home({
     ORDER BY ${orderBy}
     LIMIT ${PAGE_SIZE} OFFSET ${offset}
   `);
+
+  const [countResult, initialRows] = await Promise.all([
+    prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+      SELECT COUNT(*)::integer AS count
+      FROM "Building" b
+      LEFT JOIN "User" owner ON owner."id" = b."ownerId"
+      WHERE ${whereSql}
+    `),
+    fetchCatalogRows((requestedPage - 1) * PAGE_SIZE),
+  ]);
+  const [{ count }] = countResult;
+
+  const total = Math.max(0, count ?? 0);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const page = Math.min(requestedPage, pageCount);
+  const rows = page === requestedPage
+    ? initialRows
+    : await fetchCatalogRows((page - 1) * PAGE_SIZE);
 
   const buildings: BuildingCatalogBuilding[] = rows.map((row) => ({
     id: row.id,
