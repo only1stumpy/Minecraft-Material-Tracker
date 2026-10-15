@@ -318,7 +318,7 @@ export default function BuildingChecklist({
                   <div className="min-w-0 md:flex-1">
                     <h3 className="break-words font-semibold text-white">{row.name}</h3>
                     <p className="mt-1 text-sm leading-relaxed text-slate-400">
-                      Требуется {numberFormatter.format(row.requiredQty)} ({breakdownLabel(row.requiredQty, row.stackSize)}; {itemBreakdown.occupiedSlots} слотов) · стек {row.stackSize}
+                      Требуется {numberFormatter.format(row.requiredQty)} ({breakdownLabel(row.requiredQty, row.stackSize)}; {itemBreakdown.occupiedSlots} слотов)
                     </p>
                   </div>
                   <div className="min-w-0 space-y-2 text-sm md:max-w-[55%] md:text-right">
