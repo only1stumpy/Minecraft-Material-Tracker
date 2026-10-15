@@ -44,7 +44,7 @@ type Props = {
 
 type Action = "reserve" | "release" | "gather" | "deliver" | "correct";
 export type MaterialFilter = "all" | "mine" | "free" | "active" | "ready";
-export type MaterialSort = "name" | "remaining" | "gathered";
+export type MaterialSort = "name" | "required" | "remaining" | "gathered";
 export type BuildingChecklistFilters = {
   materialFilter: MaterialFilter;
   materialQ: string;
@@ -148,6 +148,7 @@ export default function BuildingChecklist({
       return true;
     })
     .sort((left, right) => {
+      if (sort === "required") return right.requiredQty - left.requiredQty || left.name.localeCompare(right.name, "ru");
       if (sort === "remaining") return quantities(right).remaining - quantities(left).remaining || left.name.localeCompare(right.name, "ru");
       if (sort === "gathered") return quantities(right).gathered - quantities(left).gathered || left.name.localeCompare(right.name, "ru");
       return left.name.localeCompare(right.name, "ru");
@@ -202,7 +203,7 @@ export default function BuildingChecklist({
         <label className="sr-only" htmlFor="material-filter">Фильтр материалов</label>
         <select id="material-filter" value={filter} onChange={(event) => updateFilter(event.target.value as MaterialFilter)} className="glass-control rounded-2xl px-4 py-3 text-sm"><option value="all">Все материалы</option><option value="mine">Мои материалы</option><option value="free">Свободные</option><option value="active">В работе</option><option value="ready">Собрано полностью</option></select>
         <label className="sr-only" htmlFor="material-sort">Сортировка материалов</label>
-        <select id="material-sort" value={sort} onChange={(event) => updateSort(event.target.value as MaterialSort)} className="glass-control rounded-2xl px-4 py-3 text-sm"><option value="name">По названию</option><option value="remaining">Сначала большой остаток</option><option value="gathered">По собранному количеству</option></select>
+        <select id="material-sort" value={sort} onChange={(event) => updateSort(event.target.value as MaterialSort)} className="glass-control rounded-2xl px-4 py-3 text-sm"><option value="required">Сначала большее требуемое количество</option><option value="name">По названию</option><option value="remaining">Сначала большой остаток</option><option value="gathered">По собранному количеству</option></select>
         <label className="glass-control flex items-center gap-2 rounded-2xl px-3 text-sm text-slate-300"><input type="checkbox" checked={hideCompleted} onChange={(event) => updateHideCompleted(event.target.checked)} className="accent-rose-400" />Скрыть собранное</label>
       </div>
 

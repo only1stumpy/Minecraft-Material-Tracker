@@ -41,7 +41,7 @@ const MATERIAL_ACTIVITY_LABELS = {
 type PageSearchParams = Record<string, string | string[] | undefined>;
 
 const MATERIAL_FILTERS = ["all", "mine", "free", "active", "ready"] as const;
-const MATERIAL_SORTS = ["name", "remaining", "gathered"] as const;
+const MATERIAL_SORTS = ["name", "required", "remaining", "gathered"] as const;
 
 const firstParam = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] ?? "" : value ?? "";
@@ -60,7 +60,7 @@ const parseMaterialSort = (value: string | string[] | undefined): MaterialSort =
   const candidate = firstParam(value);
   return (MATERIAL_SORTS as readonly string[]).includes(candidate)
     ? candidate as MaterialSort
-    : "name";
+    : "required";
 };
 
 const parseMaterialHideCompleted = (value: string | string[] | undefined) => {
