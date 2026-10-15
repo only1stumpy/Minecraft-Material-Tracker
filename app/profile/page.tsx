@@ -48,10 +48,9 @@ export default async function ProfilePage({
   const [createdBuildings, involvedBuildings, contributionTotals, completedTasks, activityRows, auditCount] = await Promise.all([
     prisma.building.count({ where: { ownerId: user.id, deletedAt: null } }),
     prisma.building.count({ where: { deletedAt: null, materials: { some: { contributions: { some: { userId: user.id } } } } } }),
-    prisma.$queryRaw<Array<{ gatheredQty: string; deliveredQty: string }>>(Prisma.sql`
+    prisma.$queryRaw<Array<{ gatheredQty: string }>>(Prisma.sql`
       SELECT
-        COALESCE(SUM("gatheredQty"::numeric), 0)::text AS "gatheredQty",
-        COALESCE(SUM("deliveredQty"::numeric), 0)::text AS "deliveredQty"
+        COALESCE(SUM("gatheredQty"::numeric), 0)::text AS "gatheredQty"
       FROM "MaterialContribution"
       WHERE "userId" = ${user.id}
     `),
@@ -73,7 +72,6 @@ export default async function ProfilePage({
   ]);
   const { rows: activity, hasNextPage } = splitProfileActivityPage(activityRows);
   const gatheredTotal = contributionTotals[0]?.gatheredQty ?? "0";
-  const deliveredTotal = contributionTotals[0]?.deliveredQty ?? "0";
   const activityHref = (page: number) => page <= 1 ? "/profile" : `/profile?activityPage=${page}`;
 
   return <main className="min-h-screen px-4 py-10 text-white sm:px-6 lg:px-8"><div className="mx-auto max-w-5xl space-y-8">
@@ -83,7 +81,6 @@ export default async function ProfilePage({
       <Stat value={createdBuildings} label="создано построек" />
       <Stat value={involvedBuildings} label="проектов с вашим вкладом" />
       <Stat value={formatQuantity(gatheredTotal)} label="предметов собрано" />
-      <Stat value={formatQuantity(deliveredTotal)} label="предметов доставлено" />
       <Stat value={completedTasks} label="заданий выполнено" />
       <Stat value={auditCount} label="действий в журнале" />
     </section>
