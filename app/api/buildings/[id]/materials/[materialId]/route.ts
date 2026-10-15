@@ -60,12 +60,6 @@ export async function POST(
     return errorResponse("Для коррекции укажите add или remove", 400);
   }
 
-  const previous = await prisma.materialActivity.findUnique({
-    where: { operationId: body.operationId },
-    select: { actorId: true },
-  });
-  if (previous) return NextResponse.json({ ok: true, duplicate: true });
-
   const targetUserId = typeof body.targetUserId === "string" ? body.targetUserId : actor.id;
   if (targetUserId !== actor.id && !canModerateContent(actor)) {
     return errorResponse("Нельзя исправлять вклад другого игрока", 403);
